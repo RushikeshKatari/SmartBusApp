@@ -1,0 +1,14 @@
+spring:
+  datasource:
+    url: ${DATABASE_URL}
+    username: ${DATABASE_USERNAME}
+    password: ${DATABASE_PASSWORD}
+  jpa:
+    hibernate.ddl-auto: validate
+    open-in-view: false
+server:
+  error:
+    include-message: never
+smartbus:
+  jwt-secret: ${JWT_SECRET}
+  jwt-ttl-hours: 168

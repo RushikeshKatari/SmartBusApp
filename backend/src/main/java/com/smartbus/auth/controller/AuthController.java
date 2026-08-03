@@ -1,0 +1,2 @@
+package com.smartbus.auth.controller; import com.smartbus.auth.dto.*; import com.smartbus.auth.service.QrAuthService; import jakarta.validation.Valid; import org.springframework.http.*; import org.springframework.web.bind.annotation.*;
+@RestController @RequestMapping("/auth") public class AuthController { private final QrAuthService service; public AuthController(QrAuthService service){this.service=service;} @PostMapping("/login/qr") public ResponseEntity<AuthResponse> login(@Valid @RequestBody QrLoginRequest request){return ResponseEntity.ok(service.login(request));} }

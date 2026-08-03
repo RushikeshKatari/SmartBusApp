@@ -1,0 +1,6 @@
+create table students (id uuid primary key, roll_no varchar(64) unique not null, name varchar(160) not null, department varchar(120) not null, year integer not null, phone varchar(32), bus_id uuid, status varchar(16) not null, telegram_enabled boolean not null default true, created_at timestamptz not null default now());
+create table telegram_users (id uuid primary key, student_id uuid unique not null references students(id), telegram_chat_id bigint unique not null, telegram_username varchar(128), verified boolean not null default false, last_login timestamptz);
+create table login_qr_tokens (id uuid primary key, student_id uuid not null references students(id), token uuid unique not null, telegram_chat_id bigint not null, created_at timestamptz not null default now(), is_used boolean not null default false, used_at timestamptz);
+create table auth_sessions (id uuid primary key, student_id uuid not null references students(id), device_id varchar(256) not null, platform varchar(48) not null, active boolean not null default true, created_at timestamptz not null default now(), last_seen_at timestamptz not null default now());
+create index login_qr_tokens_active_idx on login_qr_tokens(student_id) where not is_used;
+create unique index auth_sessions_one_active_student on auth_sessions(student_id) where active;

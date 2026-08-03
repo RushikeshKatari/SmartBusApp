@@ -1,0 +1,1 @@
+package com.smartbus.auth.dto; import jakarta.validation.constraints.*; public record QrLoginRequest(@NotBlank String token,@NotBlank String deviceId,@NotBlank String appVersion,@NotBlank String platform) {}

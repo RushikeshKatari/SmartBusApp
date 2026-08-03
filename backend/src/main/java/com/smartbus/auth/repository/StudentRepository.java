@@ -1,0 +1,1 @@
+package com.smartbus.auth.repository; import com.smartbus.auth.entity.Student; import java.util.*; import org.springframework.data.jpa.repository.JpaRepository; public interface StudentRepository extends JpaRepository<Student,UUID>{ Optional<Student> findByRollNo(String rollNo); }
