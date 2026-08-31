@@ -14,11 +14,11 @@ class _AdminReportsState extends State<AdminReports> {
   int _selectedTab = 0;
 
   final _tabs = [
-    _ReportTab('Attendance', Icons.people_rounded),
-    _ReportTab('Occupancy', Icons.airline_seat_recline_normal_rounded),
-    _ReportTab('Route Usage', Icons.alt_route_rounded),
-    _ReportTab('Popular Stops', Icons.location_on_rounded),
-    _ReportTab('Bus Performance', Icons.speed_rounded),
+    const _ReportTab('Attendance', Icons.people_rounded),
+    const _ReportTab('Occupancy', Icons.airline_seat_recline_normal_rounded),
+    const _ReportTab('Route Usage', Icons.alt_route_rounded),
+    const _ReportTab('Popular Stops', Icons.location_on_rounded),
+    const _ReportTab('Bus Performance', Icons.speed_rounded),
   ];
 
   @override
@@ -31,17 +31,18 @@ class _AdminReportsState extends State<AdminReports> {
           children: [
             Row(
               children: [
-                Expanded(
+                const Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Operational Analytics',
-                        style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+                        style: TextStyle(
+                            fontSize: 22, fontWeight: FontWeight.w800),
                       ),
                       Text(
                         'Visual charts and performance metrics for college bus operations',
-                        style: const TextStyle(color: AppColors.muted, fontSize: 13),
+                        style: TextStyle(color: AppColors.muted, fontSize: 13),
                       ),
                     ],
                   ),
@@ -51,7 +52,9 @@ class _AdminReportsState extends State<AdminReports> {
                   icon: Icons.download_rounded,
                   onPressed: () {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Report exported as PDF (Mock) ✓'), behavior: SnackBarBehavior.floating),
+                      const SnackBar(
+                          content: Text('Report exported as PDF (Mock) ✓'),
+                          behavior: SnackBarBehavior.floating),
                     );
                   },
                 ),
@@ -69,13 +72,16 @@ class _AdminReportsState extends State<AdminReports> {
                   return Padding(
                     padding: const EdgeInsets.only(right: 8),
                     child: ChoiceChip(
-                      avatar: Icon(tab.icon, size: 16, color: isSelected ? AppColors.primary : AppColors.muted),
+                      avatar: Icon(tab.icon,
+                          size: 16,
+                          color:
+                              isSelected ? AppColors.primary : AppColors.muted),
                       label: Text(tab.label),
                       selected: isSelected,
                       onSelected: (val) {
                         if (val) setState(() => _selectedTab = index);
                       },
-                      selectedColor: AppColors.primary.withOpacity(.12),
+                      selectedColor: AppColors.primary.withValues(alpha: .12),
                       labelStyle: TextStyle(
                         color: isSelected ? AppColors.primary : AppColors.muted,
                         fontWeight: FontWeight.w700,
@@ -94,7 +100,12 @@ class _AdminReportsState extends State<AdminReports> {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(24),
-                boxShadow: const [BoxShadow(color: Color(0x0A0F172A), blurRadius: 20, offset: Offset(0, 4))],
+                boxShadow: const [
+                  BoxShadow(
+                      color: Color(0x0A0F172A),
+                      blurRadius: 20,
+                      offset: Offset(0, 4))
+                ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -103,16 +114,19 @@ class _AdminReportsState extends State<AdminReports> {
                     children: [
                       Text(
                         _tabs[_selectedTab].label,
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                        style: const TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.w800),
                       ),
                       const Spacer(),
-                      const Icon(Icons.show_chart_rounded, color: AppColors.primary),
+                      const Icon(Icons.show_chart_rounded,
+                          color: AppColors.primary),
                     ],
                   ),
                   const SizedBox(height: 4),
                   Text(
                     _getDescriptionForTab(_selectedTab),
-                    style: const TextStyle(color: AppColors.muted, fontSize: 13),
+                    style:
+                        const TextStyle(color: AppColors.muted, fontSize: 13),
                   ),
                   const SizedBox(height: 32),
                   SizedBox(
@@ -131,27 +145,36 @@ class _AdminReportsState extends State<AdminReports> {
 
   String _getDescriptionForTab(int tabIndex) {
     switch (tabIndex) {
-      case 0: return 'Weekly comparison of student boarding vs total registered count';
-      case 1: return 'Average seating fill rate statistics across standard running buses';
-      case 2: return 'Total trips completed successfully per route during the current semester';
-      case 3: return 'Boarding density level by stop location based on scanner logs';
-      case 4: return 'On-time arrival success rate percentage of operating drivers';
-      default: return '';
+      case 0:
+        return 'Weekly comparison of student boarding vs total registered count';
+      case 1:
+        return 'Average seating fill rate statistics across standard running buses';
+      case 2:
+        return 'Total trips completed successfully per route during the current semester';
+      case 3:
+        return 'Boarding density level by stop location based on scanner logs';
+      case 4:
+        return 'On-time arrival success rate percentage of operating drivers';
+      default:
+        return '';
     }
   }
 
   Widget _buildChartForTab(int tabIndex) {
     switch (tabIndex) {
       case 0:
-        return CustomPaint(painter: _LineChartPainter(data: [42, 68, 59, 88, 72, 92]));
+        return const CustomPaint(
+            painter: _LineChartPainter(data: [42, 68, 59, 88, 72, 92]));
       case 1:
-        return CustomPaint(painter: _BarChartPainter(data: [0.74, 0.88, 0.52, 0.41, 0.68]));
+        return const CustomPaint(
+            painter: _BarChartPainter(data: [0.74, 0.88, 0.52, 0.41, 0.68]));
       case 2:
-        return CustomPaint(painter: _HorizontalBarPainter(data: [120, 85, 96, 64]));
+        return const CustomPaint(
+            painter: _HorizontalBarPainter(data: [120, 85, 96, 64]));
       case 3:
         return CustomPaint(painter: _RadarChartPainter());
       case 4:
-        return CustomPaint(painter: _GaugeChartPainter(percentage: 0.92));
+        return const CustomPaint(painter: _GaugeChartPainter(percentage: 0.92));
       default:
         return const SizedBox.shrink();
     }
@@ -186,7 +209,10 @@ class _LineChartPainter extends CustomPainter {
       ..shader = LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
-        colors: [AppColors.primary.withOpacity(.3), AppColors.primary.withOpacity(0)],
+        colors: [
+          AppColors.primary.withValues(alpha: .3),
+          AppColors.primary.withValues(alpha: 0)
+        ],
       ).createShader(Rect.fromLTRB(0, 0, size.width, size.height));
 
     final path = Path();
@@ -207,8 +233,13 @@ class _LineChartPainter extends CustomPainter {
       }
 
       // Draw dots
-      final dotPaint = Paint()..color = Colors.white..style = PaintingStyle.fill;
-      final borderPaint = Paint()..color = AppColors.primary..style = PaintingStyle.stroke..strokeWidth = 3;
+      final dotPaint = Paint()
+        ..color = Colors.white
+        ..style = PaintingStyle.fill;
+      final borderPaint = Paint()
+        ..color = AppColors.primary
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3;
       canvas.drawCircle(Offset(x, y), 6, dotPaint);
       canvas.drawCircle(Offset(x, y), 6, borderPaint);
     }
@@ -243,10 +274,13 @@ class _BarChartPainter extends CustomPainter {
         ..shader = LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [AppColors.primary, AppColors.primary.withOpacity(.4)],
+          colors: [AppColors.primary, AppColors.primary.withValues(alpha: .4)],
         ).createShader(Rect.fromLTWH(x, y, width, h));
 
-      canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(x, y, width, h), const Radius.circular(8)), paint);
+      canvas.drawRRect(
+          RRect.fromRectAndRadius(
+              Rect.fromLTWH(x, y, width, h), const Radius.circular(8)),
+          paint);
     }
   }
 
@@ -273,10 +307,16 @@ class _HorizontalBarPainter extends CustomPainter {
         ..shader = LinearGradient(
           begin: Alignment.centerLeft,
           end: Alignment.centerRight,
-          colors: [const Color(0xFF7C3AED), const Color(0xFF7C3AED).withOpacity(.4)],
+          colors: [
+            const Color(0xFF7C3AED),
+            const Color(0xFF7C3AED).withValues(alpha: .4)
+          ],
         ).createShader(Rect.fromLTWH(0, y, w, height));
 
-      canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(0, y, w, height), const Radius.circular(8)), paint);
+      canvas.drawRRect(
+          RRect.fromRectAndRadius(
+              Rect.fromLTWH(0, y, w, height), const Radius.circular(8)),
+          paint);
     }
   }
 
@@ -298,7 +338,7 @@ class _RadarChartPainter extends CustomPainter {
       ..style = PaintingStyle.stroke;
 
     final fillPaint = Paint()
-      ..color = AppColors.primary.withOpacity(.2)
+      ..color = AppColors.primary.withValues(alpha: .2)
       ..style = PaintingStyle.fill;
 
     final borderPaint = Paint()
@@ -314,7 +354,11 @@ class _RadarChartPainter extends CustomPainter {
         final angle = (i * 2 * math.pi / 5) - math.pi / 2;
         final x = cx + ringR * math.cos(angle);
         final y = cy + ringR * math.sin(angle);
-        if (i == 0) ringPath.moveTo(x, y); else ringPath.lineTo(x, y);
+        if (i == 0) {
+          ringPath.moveTo(x, y);
+        } else {
+          ringPath.lineTo(x, y);
+        }
       }
       ringPath.close();
       canvas.drawPath(ringPath, linePaint);
@@ -323,7 +367,10 @@ class _RadarChartPainter extends CustomPainter {
     // Draw Radar web spokes
     for (int i = 0; i < 5; i++) {
       final angle = (i * 2 * math.pi / 5) - math.pi / 2;
-      canvas.drawLine(Offset(cx, cy), Offset(cx + r * math.cos(angle), cy + r * math.sin(angle)), linePaint);
+      canvas.drawLine(
+          Offset(cx, cy),
+          Offset(cx + r * math.cos(angle), cy + r * math.sin(angle)),
+          linePaint);
     }
 
     // Actual Data polygon
@@ -333,7 +380,11 @@ class _RadarChartPainter extends CustomPainter {
       final angle = (i * 2 * math.pi / 5) - math.pi / 2;
       final x = cx + r * dataScale[i] * math.cos(angle);
       final y = cy + r * dataScale[i] * math.sin(angle);
-      if (i == 0) radarPath.moveTo(x, y); else radarPath.lineTo(x, y);
+      if (i == 0) {
+        radarPath.moveTo(x, y);
+      } else {
+        radarPath.lineTo(x, y);
+      }
     }
     radarPath.close();
 
@@ -363,7 +414,7 @@ class _GaugeChartPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round;
 
     final fgPaint = Paint()
-      ..shader = LinearGradient(
+      ..shader = const LinearGradient(
         colors: [AppColors.success, AppColors.primary],
       ).createShader(Rect.fromCircle(center: Offset(cx, cy), radius: r))
       ..strokeWidth = 24
@@ -371,10 +422,12 @@ class _GaugeChartPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round;
 
     // Draw base semi-circle
-    canvas.drawArc(Rect.fromCircle(center: Offset(cx, cy), radius: r), math.pi, math.pi, false, bgPaint);
+    canvas.drawArc(Rect.fromCircle(center: Offset(cx, cy), radius: r), math.pi,
+        math.pi, false, bgPaint);
 
     // Draw gauge fill percentage
-    canvas.drawArc(Rect.fromCircle(center: Offset(cx, cy), radius: r), math.pi, math.pi * percentage, false, fgPaint);
+    canvas.drawArc(Rect.fromCircle(center: Offset(cx, cy), radius: r), math.pi,
+        math.pi * percentage, false, fgPaint);
   }
 
   @override

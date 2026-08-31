@@ -1,2 +1,68 @@
-import 'package:flutter/material.dart'; import 'package:provider/provider.dart'; import '../providers/smart_bus_provider.dart'; import '../theme/app_theme.dart'; import '../widgets/common_widgets.dart';
-class SmartAlarmSheet extends StatelessWidget { const SmartAlarmSheet({super.key}); @override Widget build(BuildContext context){final p=context.watch<SmartBusProvider>();const options=['2 km','1 km','5 minutes','At Stop','Custom'];return Container(padding:const EdgeInsets.fromLTRB(20,12,20,30),decoration:const BoxDecoration(color:Colors.white,borderRadius:BorderRadius.vertical(top:Radius.circular(28))),child:Column(mainAxisSize:MainAxisSize.min,crossAxisAlignment:CrossAxisAlignment.start,children:[Center(child:Container(width:40,height:4,decoration:BoxDecoration(color:const Color(0xFFCBD5E1),borderRadius:BorderRadius.circular(4)))),const SizedBox(height:20),Row(children:[const Icon(Icons.alarm_rounded,color:AppColors.primary),const SizedBox(width:10),const Expanded(child:Text('Smart arrival alarm',style:TextStyle(fontWeight:FontWeight.w800,fontSize:20))),Switch(value:p.alarmEnabled,onChanged:p.setAlarm)]),const SizedBox(height:5),const Text('We’ll alert you before your boarding stop.',style:TextStyle(color:AppColors.muted)),const SizedBox(height:20),Wrap(spacing:9,runSpacing:9,children:options.map((o)=>ChoiceChip(label:Text(o),selected:p.alarmOption==o,selectedColor:AppColors.primary.withOpacity(.15),labelStyle:TextStyle(color:p.alarmOption==o?AppColors.primary:AppColors.ink,fontWeight:FontWeight.w600),onSelected:(_)=>p.setAlarmOption(o))).toList()),const SizedBox(height:24),SizedBox(width:double.infinity,child:ModernButton(label:'Save alarm',icon:Icons.check_rounded,onPressed:()=>Navigator.pop(context))) ]));}}
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/smart_bus_provider.dart';
+import '../theme/app_theme.dart';
+import '../widgets/common_widgets.dart';
+
+class SmartAlarmSheet extends StatelessWidget {
+  const SmartAlarmSheet({super.key});
+  @override
+  Widget build(BuildContext context) {
+    final p = context.watch<SmartBusProvider>();
+    const options = ['2 km', '1 km', '5 minutes', 'At Stop', 'Custom'];
+    return Container(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 30),
+        decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
+        child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                  child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                          color: const Color(0xFFCBD5E1),
+                          borderRadius: BorderRadius.circular(4)))),
+              const SizedBox(height: 20),
+              Row(children: [
+                const Icon(Icons.alarm_rounded, color: AppColors.primary),
+                const SizedBox(width: 10),
+                const Expanded(
+                    child: Text('Smart arrival alarm',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w800, fontSize: 20))),
+                Switch(value: p.alarmEnabled, onChanged: p.setAlarm)
+              ]),
+              const SizedBox(height: 5),
+              const Text('We’ll alert you before your boarding stop.',
+                  style: TextStyle(color: AppColors.muted)),
+              const SizedBox(height: 20),
+              Wrap(
+                  spacing: 9,
+                  runSpacing: 9,
+                  children: options
+                      .map((o) => ChoiceChip(
+                          label: Text(o),
+                          selected: p.alarmOption == o,
+                          selectedColor:
+                              AppColors.primary.withValues(alpha: .15),
+                          labelStyle: TextStyle(
+                              color: p.alarmOption == o
+                                  ? AppColors.primary
+                                  : AppColors.ink,
+                              fontWeight: FontWeight.w600),
+                          onSelected: (_) => p.setAlarmOption(o)))
+                      .toList()),
+              const SizedBox(height: 24),
+              SizedBox(
+                  width: double.infinity,
+                  child: ModernButton(
+                      label: 'Save alarm',
+                      icon: Icons.check_rounded,
+                      onPressed: () => Navigator.pop(context)))
+            ]));
+  }
+}

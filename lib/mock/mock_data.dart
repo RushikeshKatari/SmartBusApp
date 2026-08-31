@@ -45,7 +45,7 @@ class MockData {
   // MOCK ROUTES (for approval)
   // ─────────────────────────────────────────────
   static final List<RouteRecord> routeRecords = [
-    RouteRecord(
+    const RouteRecord(
       id: 'R001',
       routeName: 'North Campus Morning Run',
       busId: 'B001',
@@ -64,7 +64,7 @@ class MockData {
         RecordedBoardingStop(id: 'BS005', name: 'Sports Complex', landmark: 'Near Football Ground', type: 'Pickup', estimatedWaitMinutes: 3),
       ],
     ),
-    RouteRecord(
+    const RouteRecord(
       id: 'R002',
       routeName: 'West Gate Evening Loop',
       busId: 'B002',
@@ -81,7 +81,7 @@ class MockData {
         RecordedBoardingStop(id: 'BS008', name: 'City Market', landmark: 'Near Bus Stand', type: 'Pickup & Drop', estimatedWaitMinutes: 4),
       ],
     ),
-    RouteRecord(
+    const RouteRecord(
       id: 'R003',
       routeName: 'South Campus Loop',
       busId: 'B003',
@@ -99,7 +99,7 @@ class MockData {
         RecordedBoardingStop(id: 'BS012', name: 'Garden Area', landmark: 'Near Clock Tower', type: 'Pickup', estimatedWaitMinutes: 2),
       ],
     ),
-    RouteRecord(
+    const RouteRecord(
       id: 'R004',
       routeName: 'East Wing Route',
       busId: 'B004',
@@ -115,7 +115,7 @@ class MockData {
         RecordedBoardingStop(id: 'BS014', name: 'Library Junction', landmark: 'Old Library', type: 'Pickup & Drop', estimatedWaitMinutes: 3),
       ],
     ),
-    RouteRecord(
+    const RouteRecord(
       id: 'R005',
       routeName: 'North Hostel Run',
       busId: 'B005',

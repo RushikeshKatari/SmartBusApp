@@ -1,2 +1,85 @@
-import 'package:flutter/material.dart'; import 'package:provider/provider.dart'; import '../providers/smart_bus_provider.dart'; import '../theme/app_theme.dart'; import '../widgets/common_widgets.dart';
-class ProfileScreen extends StatelessWidget {const ProfileScreen({super.key});@override Widget build(BuildContext context){final s=context.read<SmartBusProvider>().student;return Scaffold(appBar:AppBar(title:const Text('Profile',style:TextStyle(fontWeight:FontWeight.w800))),body:ListView(padding:const EdgeInsets.all(20),children:[Center(child:Hero(tag:'avatar',child:CircleAvatar(radius:44,backgroundColor:AppColors.primary,child:Text(s.initials,style:const TextStyle(color:Colors.white,fontSize:25,fontWeight:FontWeight.w800))))),const SizedBox(height:13),Center(child:Text(s.name,style:const TextStyle(fontSize:23,fontWeight:FontWeight.w800))),const SizedBox(height:4),Center(child:Text(s.rollNumber,style:const TextStyle(color:AppColors.muted))),const SizedBox(height:25),SurfaceCard(child:Column(children:[_row(Icons.school_rounded,'Department',s.department),const Divider(),_row(Icons.directions_bus_rounded,'Assigned bus',s.busName)])),const SizedBox(height:22),const SectionHeader(title:'Account'),const SizedBox(height:10),SurfaceCard(padding:EdgeInsets.zero,child:Column(children:[_tile(Icons.settings_outlined,'Settings'),_tile(Icons.info_outline_rounded,'About SmartBus'),_tile(Icons.help_outline_rounded,'Help & support')])) ,const SizedBox(height:24),OutlinedButton.icon(onPressed:(){},icon:const Icon(Icons.logout_rounded,color:AppColors.danger),label:const Text('Logout',style:TextStyle(color:AppColors.danger,fontWeight:FontWeight.w700)),style:OutlinedButton.styleFrom(side:const BorderSide(color:Color(0x33EF4444)),padding:const EdgeInsets.all(16),shape:RoundedRectangleBorder(borderRadius:BorderRadius.circular(16))))]));}Widget _row(IconData i,String t,String v)=>Padding(padding:const EdgeInsets.symmetric(vertical:5),child:Row(children:[Icon(i,color:AppColors.primary),const SizedBox(width:13),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(t,style:const TextStyle(fontSize:12,color:AppColors.muted)),Text(v,style:const TextStyle(fontWeight:FontWeight.w700))]))]));Widget _tile(IconData i,String t)=>ListTile(leading:Icon(i,color:AppColors.ink),title:Text(t,style:const TextStyle(fontWeight:FontWeight.w600)),trailing:const Icon(Icons.chevron_right_rounded));}
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/smart_bus_provider.dart';
+import '../theme/app_theme.dart';
+import '../widgets/common_widgets.dart';
+
+class ProfileScreen extends StatelessWidget {
+  const ProfileScreen({super.key});
+  @override
+  Widget build(BuildContext context) {
+    final s = context.read<SmartBusProvider>().student;
+    return Scaffold(
+        appBar: AppBar(
+            title: const Text('Profile',
+                style: TextStyle(fontWeight: FontWeight.w800))),
+        body: ListView(padding: const EdgeInsets.all(20), children: [
+          Center(
+              child: Hero(
+                  tag: 'avatar',
+                  child: CircleAvatar(
+                      radius: 44,
+                      backgroundColor: AppColors.primary,
+                      child: Text(s.initials,
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 25,
+                              fontWeight: FontWeight.w800))))),
+          const SizedBox(height: 13),
+          Center(
+              child: Text(s.name,
+                  style: const TextStyle(
+                      fontSize: 23, fontWeight: FontWeight.w800))),
+          const SizedBox(height: 4),
+          Center(
+              child: Text(s.rollNumber,
+                  style: const TextStyle(color: AppColors.muted))),
+          const SizedBox(height: 25),
+          SurfaceCard(
+              child: Column(children: [
+            _row(Icons.school_rounded, 'Department', s.department),
+            const Divider(),
+            _row(Icons.directions_bus_rounded, 'Assigned bus', s.busName)
+          ])),
+          const SizedBox(height: 22),
+          const SectionHeader(title: 'Account'),
+          const SizedBox(height: 10),
+          SurfaceCard(
+              padding: EdgeInsets.zero,
+              child: Column(children: [
+                _tile(Icons.settings_outlined, 'Settings'),
+                _tile(Icons.info_outline_rounded, 'About SmartBus'),
+                _tile(Icons.help_outline_rounded, 'Help & support')
+              ])),
+          const SizedBox(height: 24),
+          OutlinedButton.icon(
+              onPressed: () {},
+              icon: const Icon(Icons.logout_rounded, color: AppColors.danger),
+              label: const Text('Logout',
+                  style: TextStyle(
+                      color: AppColors.danger, fontWeight: FontWeight.w700)),
+              style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Color(0x33EF4444)),
+                  padding: const EdgeInsets.all(16),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16))))
+        ]));
+  }
+
+  Widget _row(IconData i, String t, String v) => Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: Row(children: [
+        Icon(i, color: AppColors.primary),
+        const SizedBox(width: 13),
+        Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(t, style: const TextStyle(fontSize: 12, color: AppColors.muted)),
+          Text(v, style: const TextStyle(fontWeight: FontWeight.w700))
+        ]))
+      ]));
+  Widget _tile(IconData i, String t) => ListTile(
+      leading: Icon(i, color: AppColors.ink),
+      title: Text(t, style: const TextStyle(fontWeight: FontWeight.w600)),
+      trailing: const Icon(Icons.chevron_right_rounded));
+}

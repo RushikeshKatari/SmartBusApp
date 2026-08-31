@@ -28,19 +28,20 @@ class _AdminRoutesState extends State<AdminRoutes> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
+            const Row(
               children: [
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Route Approvals',
-                        style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+                        style: TextStyle(
+                            fontSize: 22, fontWeight: FontWeight.w800),
                       ),
                       Text(
                         'Review, preview, and approve boarding routes submitted by Bus In-charges',
-                        style: const TextStyle(color: AppColors.muted, fontSize: 13),
+                        style: TextStyle(color: AppColors.muted, fontSize: 13),
                       ),
                     ],
                   ),
@@ -51,7 +52,8 @@ class _AdminRoutesState extends State<AdminRoutes> {
 
             // Tab bar for filtering route status
             Row(
-              children: ['Pending', 'Approved', 'Rejected', 'All'].map((status) {
+              children:
+                  ['Pending', 'Approved', 'Rejected', 'All'].map((status) {
                 final isSelected = _selectedStatus == status;
                 return Padding(
                   padding: const EdgeInsets.only(right: 8),
@@ -61,7 +63,7 @@ class _AdminRoutesState extends State<AdminRoutes> {
                     onSelected: (val) {
                       if (val) setState(() => _selectedStatus = status);
                     },
-                    selectedColor: AppColors.primary.withOpacity(.15),
+                    selectedColor: AppColors.primary.withValues(alpha: .15),
                     labelStyle: TextStyle(
                       color: isSelected ? AppColors.primary : AppColors.muted,
                       fontWeight: FontWeight.w700,
@@ -79,21 +81,26 @@ class _AdminRoutesState extends State<AdminRoutes> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.check_circle_outline_rounded, size: 64, color: AppColors.success.withOpacity(.5)),
+                    Icon(Icons.check_circle_outline_rounded,
+                        size: 64,
+                        color: AppColors.success.withValues(alpha: .5)),
                     const SizedBox(height: 16),
                     Text(
                       'No $_selectedStatus routes found',
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                      style: const TextStyle(
+                          fontSize: 18, fontWeight: FontWeight.w800),
                     ),
                     const SizedBox(height: 4),
-                    const Text('Everything looks clean!', style: TextStyle(color: AppColors.muted)),
+                    const Text('Everything looks clean!',
+                        style: TextStyle(color: AppColors.muted)),
                   ],
                 ),
               )
             else
               LayoutBuilder(
                 builder: (context, constraints) {
-                  final crossAxisCount = (constraints.maxWidth / 340).floor().clamp(1, 3);
+                  final crossAxisCount =
+                      (constraints.maxWidth / 340).floor().clamp(1, 3);
                   return GridView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
@@ -126,15 +133,20 @@ class _AdminRoutesState extends State<AdminRoutes> {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Approve Route', style: TextStyle(fontWeight: FontWeight.w800)),
-        content: Text('Are you sure you want to approve "${route.routeName}" for ${route.busNumber}?'),
+        title: const Text('Approve Route',
+            style: TextStyle(fontWeight: FontWeight.w800)),
+        content: Text(
+            'Are you sure you want to approve "${route.routeName}" for ${route.busNumber}?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel')),
           FilledButton(
             onPressed: () {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text('Route "${route.routeName}" approved successfully ✓'),
+                  content: Text(
+                      'Route "${route.routeName}" approved successfully ✓'),
                   behavior: SnackBarBehavior.floating,
                 ),
               );
@@ -153,7 +165,8 @@ class _AdminRoutesState extends State<AdminRoutes> {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Reject Route', style: TextStyle(fontWeight: FontWeight.w800)),
+        title: const Text('Reject Route',
+            style: TextStyle(fontWeight: FontWeight.w800)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -169,12 +182,15 @@ class _AdminRoutesState extends State<AdminRoutes> {
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel')),
           FilledButton(
             onPressed: () {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text('Route "${route.routeName}" rejected. Reason: ${reasonCtrl.text}'),
+                  content: Text(
+                      'Route "${route.routeName}" rejected. Reason: ${reasonCtrl.text}'),
                   behavior: SnackBarBehavior.floating,
                 ),
               );

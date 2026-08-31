@@ -13,14 +13,23 @@ abstract final class AppColors {
 
 abstract final class AppTheme {
   static ThemeData get light {
-    final scheme = ColorScheme.fromSeed(seedColor: AppColors.primary, brightness: Brightness.light);
+    final scheme = ColorScheme.fromSeed(
+        seedColor: AppColors.primary, brightness: Brightness.light);
     return ThemeData(
       useMaterial3: true,
       colorScheme: scheme,
       scaffoldBackgroundColor: AppColors.background,
-      textTheme: GoogleFonts.interTextTheme().apply(bodyColor: AppColors.ink, displayColor: AppColors.ink),
-      appBarTheme: const AppBarTheme(backgroundColor: Colors.transparent, elevation: 0, foregroundColor: AppColors.ink),
-      cardTheme: CardThemeData(color: Colors.white, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))),
+      textTheme: GoogleFonts.interTextTheme()
+          .apply(bodyColor: AppColors.ink, displayColor: AppColors.ink),
+      appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          foregroundColor: AppColors.ink),
+      cardTheme: CardThemeData(
+          color: Colors.white,
+          elevation: 0,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))),
     );
   }
 }

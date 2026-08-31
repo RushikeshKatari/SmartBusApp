@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../mock/mock_data.dart';
-import '../../models/app_models.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/admin_widgets.dart';
-import '../../widgets/common_widgets.dart';
 import 'incharge_route_detail.dart';
 
 class InchargeRouteHistory extends StatelessWidget {
@@ -15,7 +13,8 @@ class InchargeRouteHistory extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Route History', style: TextStyle(fontWeight: FontWeight.w800)),
+        title: const Text('Route History',
+            style: TextStyle(fontWeight: FontWeight.w800)),
         actions: [
           IconButton(
             onPressed: () {},
@@ -29,20 +28,44 @@ class InchargeRouteHistory extends StatelessWidget {
           : ListView(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
               children: [
-                // Summary row
                 Row(
                   children: [
-                    Expanded(child: DashboardStatCard(label: 'Total Routes', value: '${routes.length}', icon: Icons.alt_route_rounded, color: AppColors.primary)),
+                    Expanded(
+                        child: DashboardStatCard(
+                      label: 'Total Routes',
+                      value: '${routes.length}',
+                      icon: Icons.alt_route_rounded,
+                      color: AppColors.primary,
+                    )),
                     const SizedBox(width: 12),
-                    Expanded(child: DashboardStatCard(label: 'Approved', value: '${routes.where((r) => r.status == 'Approved').length}', icon: Icons.check_circle_rounded, color: AppColors.success)),
+                    Expanded(
+                        child: DashboardStatCard(
+                            label: 'Approved',
+                            value:
+                                '${routes.where((r) => r.status == 'Approved').length}',
+                            icon: Icons.check_circle_rounded,
+                            color: AppColors.success)),
                   ],
                 ),
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    Expanded(child: DashboardStatCard(label: 'Pending', value: '${routes.where((r) => r.status == 'Pending').length}', icon: Icons.pending_actions_rounded, color: AppColors.warning)),
+                    Expanded(
+                        child: DashboardStatCard(
+                            label: 'Pending',
+                            value:
+                                '${routes.where((r) => r.status == 'Pending').length}',
+                            icon: Icons.pending_actions_rounded,
+                            color: AppColors.warning)),
                     const SizedBox(width: 12),
-                    Expanded(child: DashboardStatCard(label: 'Total km', value: '${routes.fold(0.0, (s, r) => s + r.distanceKm).toStringAsFixed(1)}', icon: Icons.straighten_rounded, color: const Color(0xFF7C3AED))),
+                    Expanded(
+                        child: DashboardStatCard(
+                            label: 'Total km',
+                            value: routes
+                                .fold(0.0, (s, r) => s + r.distanceKm)
+                                .toStringAsFixed(1),
+                            icon: Icons.straighten_rounded,
+                            color: const Color(0xFF7C3AED))),
                   ],
                 ),
                 const SizedBox(height: 24),
@@ -56,7 +79,7 @@ class InchargeRouteHistory extends StatelessWidget {
                           routeName: route.routeName,
                           distanceKm: route.distanceKm,
                           durationMinutes: route.durationMinutes,
-                          stops: [],
+                          stops: const [],
                           isPreview: false,
                           routeRecord: route,
                         )),
@@ -70,7 +93,8 @@ class InchargeRouteHistory extends StatelessWidget {
   PageRouteBuilder _slide(Widget page) => PageRouteBuilder(
         pageBuilder: (_, a, __) => page,
         transitionsBuilder: (_, a, __, child) => SlideTransition(
-          position: Tween(begin: const Offset(1, 0), end: Offset.zero).animate(CurvedAnimation(parent: a, curve: Curves.easeOutCubic)),
+          position: Tween(begin: const Offset(1, 0), end: Offset.zero)
+              .animate(CurvedAnimation(parent: a, curve: Curves.easeOutCubic)),
           child: child,
         ),
       );
@@ -82,11 +106,14 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.route_rounded, size: 72, color: AppColors.primary.withOpacity(.3)),
+            Icon(Icons.route_rounded,
+                size: 72, color: AppColors.primary.withValues(alpha: .3)),
             const SizedBox(height: 16),
-            const Text('No routes yet', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+            const Text('No routes yet',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
             const SizedBox(height: 8),
-            const Text('Record a new route to see it here.', style: TextStyle(color: AppColors.muted)),
+            const Text('Record a new route to see it here.',
+                style: TextStyle(color: AppColors.muted)),
           ],
         ),
       );

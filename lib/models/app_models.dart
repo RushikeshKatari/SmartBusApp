@@ -1,9 +1,5 @@
 import 'package:flutter/material.dart';
 
-// ─────────────────────────────────────────────
-// STUDENT MODULE MODELS (unchanged)
-// ─────────────────────────────────────────────
-
 class Student {
   const Student({required this.name, required this.rollNumber, required this.department, required this.busName, required this.initials});
   final String name, rollNumber, department, busName, initials;
@@ -32,10 +28,6 @@ class Advertisement {
   final String tag, title, subtitle;
   final Color color;
 }
-
-// ─────────────────────────────────────────────
-// ADMIN & BUS IN-CHARGE MODULE MODELS
-// ─────────────────────────────────────────────
 
 class AdminStudent {
   const AdminStudent({

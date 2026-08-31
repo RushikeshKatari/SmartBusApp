@@ -1,17 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../providers/smart_bus_provider.dart';
 import '../../mock/mock_data.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/admin_widgets.dart';
 import 'incharge_record_route.dart';
 import 'incharge_route_history.dart';
-import 'incharge_my_bus.dart';
 
 class InchargeDashboard extends StatelessWidget {
   const InchargeDashboard({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final bus = MockData.meeraBus;
+    const bus = MockData.meeraBus;
     final routes = MockData.meeraRoutes;
     final todayRoute = routes.isNotEmpty ? routes.first : null;
     final pendingRoutes = routes.where((r) => r.status == 'Pending').length;
@@ -19,11 +20,8 @@ class InchargeDashboard extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
       children: [
-        // Welcome card
         _WelcomeCard(busNumber: bus.busNumber),
         const SizedBox(height: 20),
-
-        // Today's Route Card
         const AdminSectionHeader(title: 'Today\'s Route'),
         const SizedBox(height: 10),
         _TodayRouteCard(
@@ -33,28 +31,49 @@ class InchargeDashboard extends StatelessWidget {
           status: 'Active',
         ),
         const SizedBox(height: 20),
-
-        // Stats Row
         const AdminSectionHeader(title: 'Overview'),
         const SizedBox(height: 10),
         Row(
           children: [
-            Expanded(child: DashboardStatCard(label: 'Total Stops', value: '${todayRoute?.stops.length ?? 8}', icon: Icons.location_on_rounded, color: AppColors.primary)),
+            Expanded(
+                child: DashboardStatCard(
+              label: 'Total Stops',
+              value: '${todayRoute?.stops.length ?? 8}',
+              icon: Icons.location_on_rounded,
+              color: AppColors.primary,
+            )),
             const SizedBox(width: 12),
-            Expanded(child: DashboardStatCard(label: 'Pending', value: '$pendingRoutes', icon: Icons.pending_actions_rounded, color: AppColors.warning)),
+            Expanded(
+                child: DashboardStatCard(
+              label: 'Pending',
+              value: '$pendingRoutes',
+              icon: Icons.pending_actions_rounded,
+              color: AppColors.warning,
+            )),
           ],
         ),
         const SizedBox(height: 12),
         Row(
           children: [
-            Expanded(child: DashboardStatCard(label: 'Routes', value: '${routes.length}', icon: Icons.alt_route_rounded, color: AppColors.success)),
+            Expanded(
+                child: DashboardStatCard(
+              label: 'Routes',
+              value: '${routes.length}',
+              icon: Icons.alt_route_rounded,
+              color: AppColors.success,
+            )),
             const SizedBox(width: 12),
-            Expanded(child: DashboardStatCard(label: 'Distance', value: '${todayRoute?.distanceKm ?? 18.6} km', icon: Icons.straighten_rounded, color: const Color(0xFF7C3AED))),
+            Expanded(
+                child: DashboardStatCard(
+                    label: 'Distance',
+                    value: '${todayRoute?.distanceKm ?? 18.6} km',
+                    icon: Icons.straighten_rounded,
+                    color: const Color(
+                      0xFF7C3AED,
+                    ))),
           ],
         ),
         const SizedBox(height: 24),
-
-        // Quick Actions
         const AdminSectionHeader(title: 'Quick Actions'),
         const SizedBox(height: 12),
         GridView.count(
@@ -69,25 +88,29 @@ class InchargeDashboard extends StatelessWidget {
               label: 'Record New Route',
               icon: Icons.add_road_rounded,
               color: AppColors.primary,
-              onTap: () => Navigator.push(context, _slide(const InchargeRecordRoute())),
+              onTap: () =>
+                  Navigator.push(context, _slide(const InchargeRecordRoute())),
             ),
             QuickActionCard(
               label: 'My Routes',
               icon: Icons.route_rounded,
               color: AppColors.success,
-              onTap: () => Navigator.push(context, _slide(const InchargeRouteHistory())),
+              onTap: () =>
+                  Navigator.push(context, _slide(const InchargeRouteHistory())),
             ),
             QuickActionCard(
               label: 'Boarding Stops',
               icon: Icons.location_on_rounded,
               color: const Color(0xFF7C3AED),
-              onTap: () => _showBoardingStopsSheet(context, todayRoute?.stops ?? []),
+              onTap: () =>
+                  _showBoardingStopsSheet(context, todayRoute?.stops ?? []),
             ),
             QuickActionCard(
               label: 'Route History',
               icon: Icons.history_rounded,
               color: AppColors.warning,
-              onTap: () => Navigator.push(context, _slide(const InchargeRouteHistory())),
+              onTap: () =>
+                  Navigator.push(context, _slide(const InchargeRouteHistory())),
             ),
           ],
         ),
@@ -100,7 +123,8 @@ class InchargeDashboard extends StatelessWidget {
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
       builder: (_) => DraggableScrollableSheet(
         initialChildSize: 0.6,
         minChildSize: 0.4,
@@ -110,12 +134,16 @@ class InchargeDashboard extends StatelessWidget {
           controller: controller,
           padding: const EdgeInsets.fromLTRB(20, 4, 20, 32),
           children: [
-            const Text('Boarding Stops', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
+            const Text('Boarding Stops',
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
             const SizedBox(height: 4),
-            Text('Today\'s route · ${stops.length} stops', style: const TextStyle(color: AppColors.muted)),
+            Text('Today\'s route · ${stops.length} stops',
+                style: const TextStyle(color: AppColors.muted)),
             const SizedBox(height: 20),
             if (stops.isEmpty)
-              const Center(child: Text('No stops recorded yet.', style: TextStyle(color: AppColors.muted)))
+              const Center(
+                  child: Text('No stops recorded yet.',
+                      style: TextStyle(color: AppColors.muted)))
             else
               StopTimelineWidget(stops: stops.cast()),
           ],
@@ -127,13 +155,13 @@ class InchargeDashboard extends StatelessWidget {
   PageRouteBuilder _slide(Widget page) => PageRouteBuilder(
         pageBuilder: (_, a, __) => page,
         transitionsBuilder: (_, a, __, child) => SlideTransition(
-          position: Tween(begin: const Offset(1, 0), end: Offset.zero).animate(CurvedAnimation(parent: a, curve: Curves.easeOutCubic)),
+          position: Tween(begin: const Offset(1, 0), end: Offset.zero)
+              .animate(CurvedAnimation(parent: a, curve: Curves.easeOutCubic)),
           child: child,
         ),
       );
 }
 
-// ─────────────────────────────────────────────
 class _WelcomeCard extends StatelessWidget {
   const _WelcomeCard({required this.busNumber});
   final String busNumber;
@@ -148,7 +176,10 @@ class _WelcomeCard extends StatelessWidget {
             end: Alignment.bottomRight,
           ),
           borderRadius: BorderRadius.circular(24),
-          boxShadow: const [BoxShadow(color: Color(0x332563EB), blurRadius: 20, offset: Offset(0, 8))],
+          boxShadow: const [
+            BoxShadow(
+                color: Color(0x332563EB), blurRadius: 20, offset: Offset(0, 8))
+          ],
         ),
         child: Row(
           children: [
@@ -156,21 +187,47 @@ class _WelcomeCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('GOOD MORNING', style: TextStyle(color: Colors.white60, fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 1.5)),
+                  const Text('GOOD MORNING',
+                      style: TextStyle(
+                        color: Colors.white60,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.5,
+                      )),
                   const SizedBox(height: 6),
-                  const Text('Meera Singh 👋', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800)),
+                  const Text('Meera Singh 👋',
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800)),
                   const SizedBox(height: 4),
-                  Text('Managing Bus $busNumber today', style: const TextStyle(color: Colors.white70)),
+                  Text('Managing Bus $busNumber today',
+                      style: const TextStyle(color: Colors.white70)),
                 ],
+              ),
+            ),
+            Consumer<SmartBusProvider>(
+              builder: (context, provider, _) => Switch(
+                value: provider.sharingActive,
+                onChanged: (bool val) {
+                  if (val) {
+                    provider.startLocationSharing();
+                  } else {
+                    provider.endLocationSharing();
+                  }
+                },
+                activeThumbColor: AppColors.success,
+                inactiveThumbColor: AppColors.danger,
               ),
             ),
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(.15),
+                color: Colors.white.withValues(alpha: .15),
                 borderRadius: BorderRadius.circular(18),
               ),
-              child: const Icon(Icons.directions_bus_filled_rounded, color: Colors.white, size: 32),
+              child: const Icon(Icons.directions_bus_filled_rounded,
+                  color: Colors.white, size: 32),
             ),
           ],
         ),
@@ -178,7 +235,11 @@ class _WelcomeCard extends StatelessWidget {
 }
 
 class _TodayRouteCard extends StatelessWidget {
-  const _TodayRouteCard({required this.routeName, required this.stops, required this.distance, required this.status});
+  const _TodayRouteCard(
+      {required this.routeName,
+      required this.stops,
+      required this.distance,
+      required this.status});
   final String routeName, status;
   final int stops;
   final double distance;
@@ -189,23 +250,35 @@ class _TodayRouteCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
-          boxShadow: const [BoxShadow(color: Color(0x0A0F172A), blurRadius: 16, offset: Offset(0, 4))],
+          boxShadow: const [
+            BoxShadow(
+                color: Color(0x0A0F172A), blurRadius: 16, offset: Offset(0, 4))
+          ],
         ),
         child: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: AppColors.success.withOpacity(.1), borderRadius: BorderRadius.circular(16)),
-              child: const Icon(Icons.alt_route_rounded, color: AppColors.success, size: 24),
+              decoration: BoxDecoration(
+                  color: AppColors.success.withValues(alpha: .1),
+                  borderRadius: BorderRadius.circular(16)),
+              child: const Icon(Icons.alt_route_rounded,
+                  color: AppColors.success, size: 24),
             ),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(routeName, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+                  Text(routeName,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15,
+                      )),
                   const SizedBox(height: 4),
-                  Text('$stops boarding stops · $distance km', style: const TextStyle(color: AppColors.muted, fontSize: 12)),
+                  Text('$stops boarding stops · $distance km',
+                      style: const TextStyle(
+                          color: AppColors.muted, fontSize: 12)),
                 ],
               ),
             ),

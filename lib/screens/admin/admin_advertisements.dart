@@ -29,17 +29,18 @@ class _AdminAdvertisementsState extends State<AdminAdvertisements> {
           children: [
             Row(
               children: [
-                Expanded(
+                const Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Advertisement Management',
-                        style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+                        style: TextStyle(
+                            fontSize: 22, fontWeight: FontWeight.w800),
                       ),
                       Text(
                         'Manage in-app banner announcements and schedules',
-                        style: const TextStyle(color: AppColors.muted, fontSize: 13),
+                        style: TextStyle(color: AppColors.muted, fontSize: 13),
                       ),
                     ],
                   ),
@@ -55,7 +56,8 @@ class _AdminAdvertisementsState extends State<AdminAdvertisements> {
 
             // Filtering ChoiceChips
             Row(
-              children: ['All', 'Active', 'Inactive', 'Scheduled'].map((status) {
+              children:
+                  ['All', 'Active', 'Inactive', 'Scheduled'].map((status) {
                 final isSelected = _selectedStatus == status;
                 return Padding(
                   padding: const EdgeInsets.only(right: 8),
@@ -65,7 +67,7 @@ class _AdminAdvertisementsState extends State<AdminAdvertisements> {
                     onSelected: (val) {
                       if (val) setState(() => _selectedStatus = status);
                     },
-                    selectedColor: AppColors.primary.withOpacity(.15),
+                    selectedColor: AppColors.primary.withValues(alpha: .15),
                     labelStyle: TextStyle(
                       color: isSelected ? AppColors.primary : AppColors.muted,
                       fontWeight: FontWeight.w700,
@@ -79,7 +81,8 @@ class _AdminAdvertisementsState extends State<AdminAdvertisements> {
             // Gallery Grid Layout
             LayoutBuilder(
               builder: (context, constraints) {
-                final crossAxisCount = (constraints.maxWidth / 300).floor().clamp(1, 3);
+                final crossAxisCount =
+                    (constraints.maxWidth / 300).floor().clamp(1, 3);
                 return GridView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
@@ -120,22 +123,46 @@ class _AdminAdvertisementsState extends State<AdminAdvertisements> {
       context: context,
       builder: (_) => StatefulBuilder(
         builder: (ctx, setS) => AlertDialog(
-          title: const Text('Upload Ad Banner', style: TextStyle(fontWeight: FontWeight.w800)),
+          title: const Text('Upload Ad Banner',
+              style: TextStyle(fontWeight: FontWeight.w800)),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextField(controller: tagCtrl, decoration: const InputDecoration(labelText: 'Tag / Category (e.g. SAFETY)')),
-                TextField(controller: titleCtrl, decoration: const InputDecoration(labelText: 'Banner Title')),
-                TextField(controller: subtitleCtrl, decoration: const InputDecoration(labelText: 'Subtitle Description')),
-                TextField(controller: dateFromCtrl, decoration: const InputDecoration(labelText: 'Scheduled From (e.g. 1 Aug 2026)')),
-                TextField(controller: dateToCtrl, decoration: const InputDecoration(labelText: 'Scheduled To (e.g. 31 Aug 2026)')),
+                TextField(
+                    controller: tagCtrl,
+                    decoration: const InputDecoration(
+                        labelText: 'Tag / Category (e.g. SAFETY)')),
+                TextField(
+                    controller: titleCtrl,
+                    decoration:
+                        const InputDecoration(labelText: 'Banner Title')),
+                TextField(
+                    controller: subtitleCtrl,
+                    decoration: const InputDecoration(
+                        labelText: 'Subtitle Description')),
+                TextField(
+                    controller: dateFromCtrl,
+                    decoration: const InputDecoration(
+                        labelText: 'Scheduled From (e.g. 1 Aug 2026)')),
+                TextField(
+                    controller: dateToCtrl,
+                    decoration: const InputDecoration(
+                        labelText: 'Scheduled To (e.g. 31 Aug 2026)')),
                 const SizedBox(height: 16),
-                const Text('Select Banner Background Color', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                const Text('Select Banner Background Color',
+                    style:
+                        TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
                 const SizedBox(height: 8),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [AppColors.primary, const Color(0xFF7C3AED), AppColors.success, const Color(0xFF0891B2), const Color(0xFFEC4899)].map((color) {
+                  children: [
+                    AppColors.primary,
+                    const Color(0xFF7C3AED),
+                    AppColors.success,
+                    const Color(0xFF0891B2),
+                    const Color(0xFFEC4899)
+                  ].map((color) {
                     final isSel = selectedColor == color;
                     return GestureDetector(
                       onTap: () => setS(() => selectedColor = color),
@@ -145,8 +172,15 @@ class _AdminAdvertisementsState extends State<AdminAdvertisements> {
                         decoration: BoxDecoration(
                           color: color,
                           shape: BoxShape.circle,
-                          border: isSel ? Border.all(color: Colors.white, width: 3) : null,
-                          boxShadow: isSel ? [const BoxShadow(color: Colors.black26, blurRadius: 4)] : null,
+                          border: isSel
+                              ? Border.all(color: Colors.white, width: 3)
+                              : null,
+                          boxShadow: isSel
+                              ? [
+                                  const BoxShadow(
+                                      color: Colors.black26, blurRadius: 4)
+                                ]
+                              : null,
                         ),
                       ),
                     );
@@ -156,11 +190,15 @@ class _AdminAdvertisementsState extends State<AdminAdvertisements> {
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+            TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel')),
             FilledButton(
               onPressed: () {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Banner upload saved successfully ✓'), behavior: SnackBarBehavior.floating),
+                  const SnackBar(
+                      content: Text('Banner upload saved successfully ✓'),
+                      behavior: SnackBarBehavior.floating),
                 );
                 Navigator.pop(context);
               },
@@ -184,22 +222,46 @@ class _AdminAdvertisementsState extends State<AdminAdvertisements> {
       context: context,
       builder: (_) => StatefulBuilder(
         builder: (ctx, setS) => AlertDialog(
-          title: const Text('Edit Ad Banner', style: TextStyle(fontWeight: FontWeight.w800)),
+          title: const Text('Edit Ad Banner',
+              style: TextStyle(fontWeight: FontWeight.w800)),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextField(controller: tagCtrl, decoration: const InputDecoration(labelText: 'Tag / Category')),
-                TextField(controller: titleCtrl, decoration: const InputDecoration(labelText: 'Banner Title')),
-                TextField(controller: subtitleCtrl, decoration: const InputDecoration(labelText: 'Subtitle Description')),
-                TextField(controller: dateFromCtrl, decoration: const InputDecoration(labelText: 'Scheduled From')),
-                TextField(controller: dateToCtrl, decoration: const InputDecoration(labelText: 'Scheduled To')),
+                TextField(
+                    controller: tagCtrl,
+                    decoration:
+                        const InputDecoration(labelText: 'Tag / Category')),
+                TextField(
+                    controller: titleCtrl,
+                    decoration:
+                        const InputDecoration(labelText: 'Banner Title')),
+                TextField(
+                    controller: subtitleCtrl,
+                    decoration: const InputDecoration(
+                        labelText: 'Subtitle Description')),
+                TextField(
+                    controller: dateFromCtrl,
+                    decoration:
+                        const InputDecoration(labelText: 'Scheduled From')),
+                TextField(
+                    controller: dateToCtrl,
+                    decoration:
+                        const InputDecoration(labelText: 'Scheduled To')),
                 const SizedBox(height: 16),
-                const Text('Select Banner Background Color', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                const Text('Select Banner Background Color',
+                    style:
+                        TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
                 const SizedBox(height: 8),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [AppColors.primary, const Color(0xFF7C3AED), AppColors.success, const Color(0xFF0891B2), const Color(0xFFEC4899)].map((color) {
+                  children: [
+                    AppColors.primary,
+                    const Color(0xFF7C3AED),
+                    AppColors.success,
+                    const Color(0xFF0891B2),
+                    const Color(0xFFEC4899)
+                  ].map((color) {
                     final isSel = selectedColor == color;
                     return GestureDetector(
                       onTap: () => setS(() => selectedColor = color),
@@ -209,8 +271,15 @@ class _AdminAdvertisementsState extends State<AdminAdvertisements> {
                         decoration: BoxDecoration(
                           color: color,
                           shape: BoxShape.circle,
-                          border: isSel ? Border.all(color: Colors.white, width: 3) : null,
-                          boxShadow: isSel ? [const BoxShadow(color: Colors.black26, blurRadius: 4)] : null,
+                          border: isSel
+                              ? Border.all(color: Colors.white, width: 3)
+                              : null,
+                          boxShadow: isSel
+                              ? [
+                                  const BoxShadow(
+                                      color: Colors.black26, blurRadius: 4)
+                                ]
+                              : null,
                         ),
                       ),
                     );
@@ -220,11 +289,15 @@ class _AdminAdvertisementsState extends State<AdminAdvertisements> {
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+            TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel')),
             FilledButton(
               onPressed: () {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Banner edited successfully ✓'), behavior: SnackBarBehavior.floating),
+                  const SnackBar(
+                      content: Text('Banner edited successfully ✓'),
+                      behavior: SnackBarBehavior.floating),
                 );
                 Navigator.pop(context);
               },
@@ -240,14 +313,20 @@ class _AdminAdvertisementsState extends State<AdminAdvertisements> {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Delete Banner', style: TextStyle(fontWeight: FontWeight.w800)),
-        content: Text('Are you sure you want to delete "${ad.title}"? This cannot be undone.'),
+        title: const Text('Delete Banner',
+            style: TextStyle(fontWeight: FontWeight.w800)),
+        content: Text(
+            'Are you sure you want to delete "${ad.title}"? This cannot be undone.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel')),
           FilledButton(
             onPressed: () {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Banner deleted successfully ✓'), behavior: SnackBarBehavior.floating),
+                const SnackBar(
+                    content: Text('Banner deleted successfully ✓'),
+                    behavior: SnackBarBehavior.floating),
               );
               Navigator.pop(context);
             },

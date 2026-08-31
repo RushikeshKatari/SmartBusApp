@@ -26,13 +26,19 @@ class _AdminNotificationsState extends State<AdminNotifications> {
   void _sendNotification() {
     if (_titleCtrl.text.isEmpty || _msgCtrl.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill out both title and message!'), backgroundColor: AppColors.danger, behavior: SnackBarBehavior.floating),
+        const SnackBar(
+            content: Text('Please fill out both title and message!'),
+            backgroundColor: AppColors.danger,
+            behavior: SnackBarBehavior.floating),
       );
       return;
     }
 
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Notification sent to $_selectedAudience successfully ✓'), behavior: SnackBarBehavior.floating),
+      SnackBar(
+          content:
+              Text('Notification sent to $_selectedAudience successfully ✓'),
+          behavior: SnackBarBehavior.floating),
     );
 
     setState(() {
@@ -44,8 +50,13 @@ class _AdminNotificationsState extends State<AdminNotifications> {
 
   @override
   Widget build(BuildContext context) {
-    final audienceOptions = ['All Students', 'Specific Bus (SB-04)', 'Specific Route', 'Bus Incharges'];
-    final sentList = MockData.sentNotifications;
+    final audienceOptions = [
+      'All Students',
+      'Specific Bus (SB-04)',
+      'Specific Route',
+      'Bus Incharges'
+    ];
+    const sentList = MockData.sentNotifications;
 
     return Scaffold(
       body: SingleChildScrollView(
@@ -81,7 +92,10 @@ class _AdminNotificationsState extends State<AdminNotifications> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: const [BoxShadow(color: Color(0x0A0F172A), blurRadius: 16, offset: Offset(0, 4))],
+        boxShadow: const [
+          BoxShadow(
+              color: Color(0x0A0F172A), blurRadius: 16, offset: Offset(0, 4))
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -93,8 +107,10 @@ class _AdminNotificationsState extends State<AdminNotifications> {
             onChanged: (_) => setState(() {}),
             decoration: InputDecoration(
               labelText: 'Notification Title',
-              prefixIcon: const Icon(Icons.title_rounded, color: AppColors.primary),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+              prefixIcon:
+                  const Icon(Icons.title_rounded, color: AppColors.primary),
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
             ),
           ),
           const SizedBox(height: 16),
@@ -109,11 +125,13 @@ class _AdminNotificationsState extends State<AdminNotifications> {
                 padding: EdgeInsets.only(bottom: 56),
                 child: Icon(Icons.message_rounded, color: AppColors.primary),
               ),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
             ),
           ),
           const SizedBox(height: 16),
-          const Text('Target Audience', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+          const Text('Target Audience',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
@@ -126,7 +144,7 @@ class _AdminNotificationsState extends State<AdminNotifications> {
                 onSelected: (val) {
                   if (val) setState(() => _selectedAudience = aud);
                 },
-                selectedColor: AppColors.primary.withOpacity(.15),
+                selectedColor: AppColors.primary.withValues(alpha: .15),
                 labelStyle: TextStyle(
                   color: isSel ? AppColors.primary : AppColors.muted,
                   fontWeight: FontWeight.w700,
@@ -138,7 +156,8 @@ class _AdminNotificationsState extends State<AdminNotifications> {
           const SizedBox(height: 24),
           const Divider(color: Color(0xFFF1F5F9)),
           const SizedBox(height: 12),
-          const Text('Live Preview', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+          const Text('Live Preview',
+              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
           const SizedBox(height: 8),
           _buildLivePreviewCard(),
           const SizedBox(height: 20),
@@ -156,8 +175,12 @@ class _AdminNotificationsState extends State<AdminNotifications> {
   }
 
   Widget _buildLivePreviewCard() {
-    final title = _titleCtrl.text.isEmpty ? 'Notification Title Placeholder' : _titleCtrl.text;
-    final msg = _msgCtrl.text.isEmpty ? 'The content of your notification announcement will appear here in real-time as you type...' : _msgCtrl.text;
+    final title = _titleCtrl.text.isEmpty
+        ? 'Notification Title Placeholder'
+        : _titleCtrl.text;
+    final msg = _msgCtrl.text.isEmpty
+        ? 'The content of your notification announcement will appear here in real-time as you type...'
+        : _msgCtrl.text;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -170,8 +193,11 @@ class _AdminNotificationsState extends State<AdminNotifications> {
         children: [
           Container(
             padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(color: AppColors.primary.withOpacity(.1), borderRadius: BorderRadius.circular(10)),
-            child: const Icon(Icons.campaign_rounded, color: AppColors.primary, size: 18),
+            decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: .1),
+                borderRadius: BorderRadius.circular(10)),
+            child: const Icon(Icons.campaign_rounded,
+                color: AppColors.primary, size: 18),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -181,17 +207,30 @@ class _AdminNotificationsState extends State<AdminNotifications> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Expanded(child: Text(title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13))),
+                    Expanded(
+                        child: Text(title,
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w800, fontSize: 13))),
                     const SizedBox(width: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(4)),
-                      child: Text(_selectedAudience.split(' ').first.toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                          color: AppColors.primary,
+                          borderRadius: BorderRadius.circular(4)),
+                      child: Text(
+                          _selectedAudience.split(' ').first.toUpperCase(),
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold)),
                     ),
                   ],
                 ),
                 const SizedBox(height: 4),
-                Text(msg, style: const TextStyle(color: AppColors.muted, fontSize: 12, height: 1.35)),
+                Text(msg,
+                    style: const TextStyle(
+                        color: AppColors.muted, fontSize: 12, height: 1.35)),
               ],
             ),
           ),
@@ -206,7 +245,10 @@ class _AdminNotificationsState extends State<AdminNotifications> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: const [BoxShadow(color: Color(0x0A0F172A), blurRadius: 16, offset: Offset(0, 4))],
+        boxShadow: const [
+          BoxShadow(
+              color: Color(0x0A0F172A), blurRadius: 16, offset: Offset(0, 4))
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -217,7 +259,8 @@ class _AdminNotificationsState extends State<AdminNotifications> {
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: list.length,
-            separatorBuilder: (_, __) => const Divider(height: 24, color: Color(0xFFF1F5F9)),
+            separatorBuilder: (_, __) =>
+                const Divider(height: 24, color: Color(0xFFF1F5F9)),
             itemBuilder: (_, index) {
               final item = list[index];
               return Row(
@@ -225,25 +268,41 @@ class _AdminNotificationsState extends State<AdminNotifications> {
                 children: [
                   Container(
                     padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(12)),
-                    child: const Icon(Icons.notifications_active_rounded, color: AppColors.muted, size: 20),
+                    decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(12)),
+                    child: const Icon(Icons.notifications_active_rounded,
+                        color: AppColors.muted, size: 20),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(item.title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+                        Text(item.title,
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w800, fontSize: 14)),
                         const SizedBox(height: 2),
-                        Text(item.message, style: const TextStyle(color: AppColors.muted, fontSize: 12, height: 1.3)),
+                        Text(item.message,
+                            style: const TextStyle(
+                                color: AppColors.muted,
+                                fontSize: 12,
+                                height: 1.3)),
                         const SizedBox(height: 8),
                         Row(
                           children: [
-                            Text(item.sentAt, style: const TextStyle(color: AppColors.muted, fontSize: 11)),
+                            Text(item.sentAt,
+                                style: const TextStyle(
+                                    color: AppColors.muted, fontSize: 11)),
                             const Spacer(),
-                            const Icon(Icons.people_alt_rounded, size: 12, color: AppColors.muted),
+                            const Icon(Icons.people_alt_rounded,
+                                size: 12, color: AppColors.muted),
                             const SizedBox(width: 4),
-                            Text('Reached ${item.reachCount}', style: const TextStyle(color: AppColors.muted, fontSize: 11, fontWeight: FontWeight.bold)),
+                            Text('Reached ${item.reachCount}',
+                                style: const TextStyle(
+                                    color: AppColors.muted,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold)),
                           ],
                         ),
                       ],

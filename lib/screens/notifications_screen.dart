@@ -1,2 +1,33 @@
-import 'package:flutter/material.dart'; import 'package:provider/provider.dart'; import '../providers/smart_bus_provider.dart'; import '../widgets/common_widgets.dart';
-class NotificationsScreen extends StatelessWidget {const NotificationsScreen({super.key});@override Widget build(BuildContext context){final items=context.watch<SmartBusProvider>().notifications;return Scaffold(appBar:AppBar(title:const Text('Notifications',style:TextStyle(fontWeight:FontWeight.w800)),actions:[TextButton(onPressed:(){},child:const Text('Read all'))]),body:ListView(padding:const EdgeInsets.all(20),children:[Wrap(spacing:8,children:['All','Trip','Attendance','Route'].map((e)=>ChoiceChip(label:Text(e),selected:e=='All',onSelected:(_)=>{})).toList()),const SizedBox(height:20),...items.map((n)=>Padding(padding:const EdgeInsets.only(bottom:12),child:NotificationCard(notification:n)))]));}}
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/smart_bus_provider.dart';
+import '../widgets/common_widgets.dart';
+
+class NotificationsScreen extends StatelessWidget {
+  const NotificationsScreen({super.key});
+  @override
+  Widget build(BuildContext context) {
+    final items = context.watch<SmartBusProvider>().notifications;
+    return Scaffold(
+        appBar: AppBar(
+            title: const Text('Notifications',
+                style: TextStyle(fontWeight: FontWeight.w800)),
+            actions: [
+              TextButton(onPressed: () {}, child: const Text('Read all'))
+            ]),
+        body: ListView(padding: const EdgeInsets.all(20), children: [
+          Wrap(
+              spacing: 8,
+              children: ['All', 'Trip', 'Attendance', 'Route']
+                  .map((e) => ChoiceChip(
+                      label: Text(e),
+                      selected: e == 'All',
+                      onSelected: (_) => {}))
+                  .toList()),
+          const SizedBox(height: 20),
+          ...items.map((n) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: NotificationCard(notification: n)))
+        ]));
+  }
+}

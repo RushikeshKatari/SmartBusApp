@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: smartbus_user
+      POSTGRES_PASSWORD: smartbus_password
+      POSTGRES_DB: smartbus_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  backend:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - DATABASE_URL=jdbc:postgresql://db:5432/smartbus_db
+      - DATABASE_USERNAME=smartbus_user
+      - DATABASE_PASSWORD=smartbus_password
+      - JWT_SECRET=this_is_a_very_secure_and_long_jwt_secret_for_smartbus_256_bits!
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - db
+      - redis
+
+volumes:
+  postgres_data:

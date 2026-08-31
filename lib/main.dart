@@ -13,11 +13,15 @@ class SmartBusApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ChangeNotifierProvider(
         create: (_) => SmartBusProvider(),
-        child: MaterialApp(
-          title: 'SmartBus',
-          debugShowCheckedModeBanner: false,
-          theme: AppTheme.light,
-          home: const RoleSelectionScreen(),
+        child: Consumer<SmartBusProvider>(
+          builder: (context, provider, child) => MaterialApp(
+            title: 'SmartBus',
+            debugShowCheckedModeBanner: false,
+            theme: AppTheme.light,
+            darkTheme: ThemeData.dark(useMaterial3: true),
+            themeMode: provider.themeMode,
+            home: const RoleSelectionScreen(),
+          ),
         ),
       );
 }

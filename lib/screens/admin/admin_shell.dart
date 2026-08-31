@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../providers/smart_bus_provider.dart';
 import '../../theme/app_theme.dart';
 import 'admin_dashboard.dart';
 import 'admin_students.dart';
@@ -8,7 +10,10 @@ import 'admin_routes.dart';
 import 'admin_advertisements.dart';
 import 'admin_notifications.dart';
 import 'admin_reports.dart';
+import 'admin_attendance.dart';
+import 'admin_qr_scanner.dart';
 import 'admin_settings.dart';
+import 'admin_emergency.dart';
 
 class AdminShell extends StatefulWidget {
   const AdminShell({super.key});
@@ -16,33 +21,56 @@ class AdminShell extends StatefulWidget {
   State<AdminShell> createState() => _AdminShellState();
 }
 
-class _AdminShellState extends State<AdminShell> with SingleTickerProviderStateMixin {
+class _AdminShellState extends State<AdminShell> {
   int _selected = 0;
 
   static const _navItems = [
     _NavItem(Icons.dashboard_rounded, Icons.dashboard_outlined, 'Dashboard'),
     _NavItem(Icons.people_alt_rounded, Icons.people_alt_outlined, 'Students'),
-    _NavItem(Icons.manage_accounts_rounded, Icons.manage_accounts_outlined, 'Bus Incharges'),
-    _NavItem(Icons.directions_bus_rounded, Icons.directions_bus_outlined, 'Buses'),
+    _NavItem(Icons.manage_accounts_rounded, Icons.manage_accounts_outlined,
+        'Bus Incharges'),
+    _NavItem(
+        Icons.directions_bus_rounded, Icons.directions_bus_outlined, 'Buses'),
     _NavItem(Icons.alt_route_rounded, Icons.route_outlined, 'Routes'),
     _NavItem(Icons.campaign_rounded, Icons.campaign_outlined, 'Advertisements'),
-    _NavItem(Icons.notifications_rounded, Icons.notifications_outlined, 'Notifications'),
+    _NavItem(Icons.notifications_rounded, Icons.notifications_outlined,
+        'Notifications'),
+    _NavItem(Icons.how_to_reg_rounded, Icons.how_to_reg_outlined, 'Attendance'),
+    _NavItem(Icons.qr_code_scanner_rounded, Icons.qr_code_scanner_outlined,
+        'QR Scanner'),
     _NavItem(Icons.bar_chart_rounded, Icons.bar_chart_outlined, 'Reports'),
+    _NavItem(Icons.warning_rounded, Icons.warning_outlined, 'Emergency'),
     _NavItem(Icons.settings_rounded, Icons.settings_outlined, 'Settings'),
   ];
 
   Widget _buildPage() {
     switch (_selected) {
-      case 0: return const AdminDashboard(key: ValueKey('dash'));
-      case 1: return const AdminStudents(key: ValueKey('students'));
-      case 2: return const AdminIncharges(key: ValueKey('incharges'));
-      case 3: return const AdminBuses(key: ValueKey('buses'));
-      case 4: return const AdminRoutes(key: ValueKey('routes'));
-      case 5: return const AdminAdvertisements(key: ValueKey('ads'));
-      case 6: return const AdminNotifications(key: ValueKey('notif'));
-      case 7: return const AdminReports(key: ValueKey('reports'));
-      case 8: return const AdminSettings(key: ValueKey('settings'));
-      default: return const AdminDashboard(key: ValueKey('dash'));
+      case 0:
+        return const AdminDashboard(key: ValueKey('dash'));
+      case 1:
+        return const AdminStudents(key: ValueKey('students'));
+      case 2:
+        return const AdminIncharges(key: ValueKey('incharges'));
+      case 3:
+        return const AdminBuses(key: ValueKey('buses'));
+      case 4:
+        return const AdminRoutes(key: ValueKey('routes'));
+      case 5:
+        return const AdminAdvertisements(key: ValueKey('ads'));
+      case 6:
+        return const AdminNotifications(key: ValueKey('notif'));
+      case 7:
+        return const AdminAttendance(key: ValueKey('attd'));
+      case 8:
+        return const AdminQrScanner(key: ValueKey('scanner'));
+      case 9:
+        return const AdminReports(key: ValueKey('reports'));
+      case 10:
+        return const AdminEmergency(key: ValueKey('emergency'));
+      case 11:
+        return const AdminSettings(key: ValueKey('settings'));
+      default:
+        return const AdminDashboard(key: ValueKey('dash'));
     }
   }
 
@@ -56,7 +84,10 @@ class _AdminShellState extends State<AdminShell> with SingleTickerProviderStateM
       body: Row(
         children: [
           // Permanent sidebar on desktop
-          if (isDesktop) _Sidebar(selected: _selected, onSelect: (i) => setState(() => _selected = i)),
+          if (isDesktop)
+            _Sidebar(
+                selected: _selected,
+                onSelect: (i) => setState(() => _selected = i)),
 
           Expanded(
             child: Column(
@@ -67,7 +98,8 @@ class _AdminShellState extends State<AdminShell> with SingleTickerProviderStateM
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   decoration: const BoxDecoration(
                     color: Colors.white,
-                    border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9))),
+                    border:
+                        Border(bottom: BorderSide(color: Color(0xFFF1F5F9))),
                   ),
                   child: Row(
                     children: [
@@ -78,7 +110,8 @@ class _AdminShellState extends State<AdminShell> with SingleTickerProviderStateM
                         ),
                       Text(
                         _navItems[_selected].label,
-                        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+                        style: const TextStyle(
+                            fontSize: 22, fontWeight: FontWeight.w800),
                       ),
                       const Spacer(),
                       // Search icon
@@ -88,7 +121,22 @@ class _AdminShellState extends State<AdminShell> with SingleTickerProviderStateM
                           color: const Color(0xFFF8FAFC),
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const Icon(Icons.search_rounded, color: AppColors.muted, size: 20),
+                        child: const Icon(Icons.search_rounded,
+                            color: AppColors.muted, size: 20),
+                      ),
+                      const SizedBox(width: 10),
+                      // Theme toggle
+                      Consumer<SmartBusProvider>(
+                        builder: (context, provider, _) => IconButton(
+                          icon: Icon(
+                              provider.isDarkMode
+                                  ? Icons.wb_sunny_rounded
+                                  : Icons.nightlight_round,
+                              color: AppColors.muted,
+                              size: 20),
+                          onPressed: () => provider.toggleTheme(),
+                          tooltip: 'Toggle Theme',
+                        ),
                       ),
                       const SizedBox(width: 10),
                       // Notification
@@ -99,8 +147,8 @@ class _AdminShellState extends State<AdminShell> with SingleTickerProviderStateM
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Badge(
-                          smallSize: 7,
-                          child: const Icon(Icons.notifications_outlined, color: AppColors.muted, size: 20),
+                          child: const Icon(Icons.notifications_outlined,
+                              color: AppColors.muted, size: 20),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -111,8 +159,13 @@ class _AdminShellState extends State<AdminShell> with SingleTickerProviderStateM
                           children: [
                             CircleAvatar(
                               radius: 18,
-                              backgroundColor: AppColors.primary.withOpacity(.15),
-                              child: const Text('AD', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w800, fontSize: 12)),
+                              backgroundColor:
+                                  AppColors.primary.withValues(alpha: .15),
+                              child: const Text('AD',
+                                  style: TextStyle(
+                                      color: AppColors.primary,
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 12)),
                             ),
                             if (isTablet || isDesktop) ...[
                               const SizedBox(width: 8),
@@ -120,8 +173,14 @@ class _AdminShellState extends State<AdminShell> with SingleTickerProviderStateM
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text('Admin', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-                                  Text('Super Admin', style: TextStyle(color: AppColors.muted, fontSize: 11)),
+                                  Text('Admin',
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 13)),
+                                  Text('Super Admin',
+                                      style: TextStyle(
+                                          color: AppColors.muted,
+                                          fontSize: 11)),
                                 ],
                               ),
                             ],
@@ -136,7 +195,8 @@ class _AdminShellState extends State<AdminShell> with SingleTickerProviderStateM
                 Expanded(
                   child: AnimatedSwitcher(
                     duration: const Duration(milliseconds: 200),
-                    transitionBuilder: (child, animation) => FadeTransition(opacity: animation, child: child),
+                    transitionBuilder: (child, animation) =>
+                        FadeTransition(opacity: animation, child: child),
                     child: _buildPage(),
                   ),
                 ),
@@ -177,17 +237,26 @@ class _AdminShellState extends State<AdminShell> with SingleTickerProviderStateM
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Admin Account', style: TextStyle(fontWeight: FontWeight.w800)),
+        title: const Text('Admin Account',
+            style: TextStyle(fontWeight: FontWeight.w800)),
         content: const Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            ListTile(leading: Icon(Icons.person_rounded), title: Text('Super Admin'), subtitle: Text('admin@college.edu')),
+            ListTile(
+                leading: Icon(Icons.person_rounded),
+                title: Text('Super Admin'),
+                subtitle: Text('admin@college.edu')),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close')),
           FilledButton(
-            onPressed: () { Navigator.pop(context); Navigator.pop(context); },
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.pop(context);
+            },
             style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
             child: const Text('Logout'),
           ),
@@ -220,15 +289,24 @@ class _Sidebar extends StatelessWidget {
                 children: [
                   Container(
                     padding: const EdgeInsets.all(9),
-                    decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(12)),
-                    child: const Icon(Icons.directions_bus_rounded, color: Colors.white, size: 20),
+                    decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        borderRadius: BorderRadius.circular(12)),
+                    child: const Icon(Icons.directions_bus_rounded,
+                        color: Colors.white, size: 20),
                   ),
                   const SizedBox(width: 12),
                   const Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('SmartBus', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800)),
-                      Text('Admin Panel', style: TextStyle(color: Colors.white38, fontSize: 11)),
+                      Text('SmartBus',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800)),
+                      Text('Admin Panel',
+                          style:
+                              TextStyle(color: Colors.white38, fontSize: 11)),
                     ],
                   ),
                 ],
@@ -252,9 +330,14 @@ class _Sidebar extends StatelessWidget {
                     child: ListTile(
                       onTap: () => onSelect(i),
                       selected: sel,
-                      selectedTileColor: AppColors.primary.withOpacity(.2),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      leading: Icon(sel ? item.iconFilled : item.icon, color: sel ? AppColors.primary : const Color(0xFF94A3B8), size: 20),
+                      selectedTileColor:
+                          AppColors.primary.withValues(alpha: .2),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      leading: Icon(sel ? item.iconFilled : item.icon,
+                          color:
+                              sel ? AppColors.primary : const Color(0xFF94A3B8),
+                          size: 20),
                       title: Text(
                         item.label,
                         style: TextStyle(
@@ -263,7 +346,8 @@ class _Sidebar extends StatelessWidget {
                           fontSize: 14,
                         ),
                       ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 4),
                       dense: true,
                     ),
                   );
@@ -275,9 +359,15 @@ class _Sidebar extends StatelessWidget {
               padding: const EdgeInsets.all(16),
               child: ListTile(
                 onTap: () => Navigator.pop(context),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                leading: const Icon(Icons.logout_rounded, color: Color(0xFF94A3B8), size: 20),
-                title: const Text('Logout', style: TextStyle(color: Color(0xFF94A3B8), fontWeight: FontWeight.w500, fontSize: 14)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+                leading: const Icon(Icons.logout_rounded,
+                    color: Color(0xFF94A3B8), size: 20),
+                title: const Text('Logout',
+                    style: TextStyle(
+                        color: Color(0xFF94A3B8),
+                        fontWeight: FontWeight.w500,
+                        fontSize: 14)),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 14),
                 dense: true,
               ),

@@ -16,7 +16,7 @@ class _AdminBusesState extends State<AdminBuses> {
 
   @override
   Widget build(BuildContext context) {
-    final buses = MockData.buses;
+    const buses = MockData.buses;
 
     return Scaffold(
       body: SingleChildScrollView(
@@ -32,20 +32,28 @@ class _AdminBusesState extends State<AdminBuses> {
                     children: [
                       const Text(
                         'Bus Management',
-                        style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+                        style: TextStyle(
+                            fontSize: 22, fontWeight: FontWeight.w800),
                       ),
                       Text(
                         'Manage your fleet of ${buses.length} buses',
-                        style: const TextStyle(color: AppColors.muted, fontSize: 13),
+                        style: const TextStyle(
+                            color: AppColors.muted, fontSize: 13),
                       ),
                     ],
                   ),
                 ),
                 // Grid/List toggle
                 IconButton(
-                  icon: Icon(_isGridView ? Icons.view_list_rounded : Icons.grid_view_rounded, color: AppColors.primary),
+                  icon: Icon(
+                      _isGridView
+                          ? Icons.view_list_rounded
+                          : Icons.grid_view_rounded,
+                      color: AppColors.primary),
                   onPressed: () => setState(() => _isGridView = !_isGridView),
-                  tooltip: _isGridView ? 'Switch to List View' : 'Switch to Grid View',
+                  tooltip: _isGridView
+                      ? 'Switch to List View'
+                      : 'Switch to Grid View',
                 ),
                 const SizedBox(width: 8),
                 PrimaryButton(
@@ -56,11 +64,11 @@ class _AdminBusesState extends State<AdminBuses> {
               ],
             ),
             const SizedBox(height: 24),
-
             _isGridView
                 ? LayoutBuilder(
                     builder: (context, constraints) {
-                      final crossAxisCount = (constraints.maxWidth / 300).floor().clamp(1, 4);
+                      final crossAxisCount =
+                          (constraints.maxWidth / 300).floor().clamp(1, 4);
                       return GridView.builder(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
@@ -77,7 +85,8 @@ class _AdminBusesState extends State<AdminBuses> {
                             bus: bus,
                             onEdit: () => _showEditBusDialog(bus),
                             onAssign: () => _showAssignInchargeDialog(bus),
-                            onDeactivate: () => _showDeactivateConfirmation(bus),
+                            onDeactivate: () =>
+                                _showDeactivateConfirmation(bus),
                           );
                         },
                       );
@@ -87,25 +96,40 @@ class _AdminBusesState extends State<AdminBuses> {
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(20),
-                      boxShadow: const [BoxShadow(color: Color(0x0A0F172A), blurRadius: 16, offset: Offset(0, 4))],
+                      boxShadow: const [
+                        BoxShadow(
+                            color: Color(0x0A0F172A),
+                            blurRadius: 16,
+                            offset: Offset(0, 4))
+                      ],
                     ),
                     clipBehavior: Clip.antiAlias,
                     child: ListView.separated(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
                       itemCount: buses.length,
-                      separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                      separatorBuilder: (_, __) =>
+                          const Divider(height: 1, color: Color(0xFFF1F5F9)),
                       itemBuilder: (context, index) {
                         final bus = buses[index];
                         return ListTile(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 20, vertical: 12),
                           leading: Container(
                             padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(color: AppColors.primary.withOpacity(.1), borderRadius: BorderRadius.circular(12)),
-                            child: const Icon(Icons.directions_bus_filled_rounded, color: AppColors.primary),
+                            decoration: BoxDecoration(
+                                color: AppColors.primary.withValues(alpha: .1),
+                                borderRadius: BorderRadius.circular(12)),
+                            child: const Icon(
+                                Icons.directions_bus_filled_rounded,
+                                color: AppColors.primary),
                           ),
-                          title: Text('${bus.busNumber} · ${bus.busName}', style: const TextStyle(fontWeight: FontWeight.w800)),
-                          subtitle: Text('Driver: ${bus.driverName} · Cap: ${bus.capacity} · Route: ${bus.assignedRoute}', style: const TextStyle(fontSize: 12)),
+                          title: Text('${bus.busNumber} · ${bus.busName}',
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.w800)),
+                          subtitle: Text(
+                              'Driver: ${bus.driverName} · Cap: ${bus.capacity} · Route: ${bus.assignedRoute}',
+                              style: const TextStyle(fontSize: 12)),
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
@@ -114,13 +138,24 @@ class _AdminBusesState extends State<AdminBuses> {
                               PopupMenuButton<String>(
                                 onSelected: (val) {
                                   if (val == 'edit') _showEditBusDialog(bus);
-                                  if (val == 'assign') _showAssignInchargeDialog(bus);
-                                  if (val == 'status') _showDeactivateConfirmation(bus);
+                                  if (val == 'assign') {
+                                    _showAssignInchargeDialog(bus);
+                                  }
+                                  if (val == 'status') {
+                                    _showDeactivateConfirmation(bus);
+                                  }
                                 },
                                 itemBuilder: (_) => [
-                                  const PopupMenuItem(value: 'edit', child: Text('Edit Bus')),
-                                  const PopupMenuItem(value: 'assign', child: Text('Assign In-charge')),
-                                  PopupMenuItem(value: 'status', child: Text(bus.status == 'Maintenance' ? 'Activate' : 'Deactivate')),
+                                  const PopupMenuItem(
+                                      value: 'edit', child: Text('Edit Bus')),
+                                  const PopupMenuItem(
+                                      value: 'assign',
+                                      child: Text('Assign In-charge')),
+                                  PopupMenuItem(
+                                      value: 'status',
+                                      child: Text(bus.status == 'Maintenance'
+                                          ? 'Activate'
+                                          : 'Deactivate')),
                                 ],
                               ),
                             ],
@@ -149,41 +184,79 @@ class _AdminBusesState extends State<AdminBuses> {
       context: context,
       builder: (_) => StatefulBuilder(
         builder: (ctx, setS) => AlertDialog(
-          title: const Text('Add Bus', style: TextStyle(fontWeight: FontWeight.w800)),
+          title: const Text('Add Bus',
+              style: TextStyle(fontWeight: FontWeight.w800)),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextField(controller: numberCtrl, decoration: const InputDecoration(labelText: 'Bus Number (e.g. SB-04)')),
-                TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Bus Name (e.g. Campus Express)')),
-                TextField(controller: regCtrl, decoration: const InputDecoration(labelText: 'Registration Number')),
-                TextField(controller: capacityCtrl, decoration: const InputDecoration(labelText: 'Capacity (Seats)'), keyboardType: TextInputType.number),
-                TextField(controller: driverNameCtrl, decoration: const InputDecoration(labelText: 'Driver Name')),
-                TextField(controller: driverPhoneCtrl, decoration: const InputDecoration(labelText: 'Driver Phone')),
+                TextField(
+                    controller: numberCtrl,
+                    decoration: const InputDecoration(
+                        labelText: 'Bus Number (e.g. SB-04)')),
+                TextField(
+                    controller: nameCtrl,
+                    decoration: const InputDecoration(
+                        labelText: 'Bus Name (e.g. Campus Express)')),
+                TextField(
+                    controller: regCtrl,
+                    decoration: const InputDecoration(
+                        labelText: 'Registration Number')),
+                TextField(
+                    controller: capacityCtrl,
+                    decoration:
+                        const InputDecoration(labelText: 'Capacity (Seats)'),
+                    keyboardType: TextInputType.number),
+                TextField(
+                    controller: driverNameCtrl,
+                    decoration:
+                        const InputDecoration(labelText: 'Driver Name')),
+                TextField(
+                    controller: driverPhoneCtrl,
+                    decoration:
+                        const InputDecoration(labelText: 'Driver Phone')),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
-                  value: route,
+                  initialValue: route,
                   decoration: const InputDecoration(labelText: 'Route'),
-                  items: ['North Campus Morning Run', 'West Gate Evening Loop', 'South Campus Loop', 'East Wing Route', 'North Hostel Run']
-                      .map((r) => DropdownMenuItem(value: r, child: Text(r))).toList(),
+                  items: [
+                    'North Campus Morning Run',
+                    'West Gate Evening Loop',
+                    'South Campus Loop',
+                    'East Wing Route',
+                    'North Hostel Run'
+                  ]
+                      .map((r) => DropdownMenuItem(value: r, child: Text(r)))
+                      .toList(),
                   onChanged: (val) => setS(() => route = val!),
                 ),
                 DropdownButtonFormField<String>(
-                  value: incharge,
+                  initialValue: incharge,
                   decoration: const InputDecoration(labelText: 'Bus In-charge'),
-                  items: ['Meera Singh', 'Suresh Rao', 'Fatima Khan', 'Ranjit Verma', 'Lakshmi Pillai']
-                      .map((i) => DropdownMenuItem(value: i, child: Text(i))).toList(),
+                  items: [
+                    'Meera Singh',
+                    'Suresh Rao',
+                    'Fatima Khan',
+                    'Ranjit Verma',
+                    'Lakshmi Pillai'
+                  ]
+                      .map((i) => DropdownMenuItem(value: i, child: Text(i)))
+                      .toList(),
                   onChanged: (val) => setS(() => incharge = val!),
                 ),
               ],
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+            TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel')),
             FilledButton(
               onPressed: () {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Bus created successfully (Mock) ✓'), behavior: SnackBarBehavior.floating),
+                  const SnackBar(
+                      content: Text('Bus created successfully (Mock) ✓'),
+                      behavior: SnackBarBehavior.floating),
                 );
                 Navigator.pop(context);
               },
@@ -207,33 +280,54 @@ class _AdminBusesState extends State<AdminBuses> {
       context: context,
       builder: (_) => StatefulBuilder(
         builder: (ctx, setS) => AlertDialog(
-          title: Text('Edit ${bus.busNumber}', style: const TextStyle(fontWeight: FontWeight.w800)),
+          title: Text('Edit ${bus.busNumber}',
+              style: const TextStyle(fontWeight: FontWeight.w800)),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Bus Name')),
-                TextField(controller: regCtrl, decoration: const InputDecoration(labelText: 'Registration Number')),
-                TextField(controller: capacityCtrl, decoration: const InputDecoration(labelText: 'Capacity (Seats)'), keyboardType: TextInputType.number),
-                TextField(controller: driverNameCtrl, decoration: const InputDecoration(labelText: 'Driver Name')),
-                TextField(controller: driverPhoneCtrl, decoration: const InputDecoration(labelText: 'Driver Phone')),
+                TextField(
+                    controller: nameCtrl,
+                    decoration: const InputDecoration(labelText: 'Bus Name')),
+                TextField(
+                    controller: regCtrl,
+                    decoration: const InputDecoration(
+                        labelText: 'Registration Number')),
+                TextField(
+                    controller: capacityCtrl,
+                    decoration:
+                        const InputDecoration(labelText: 'Capacity (Seats)'),
+                    keyboardType: TextInputType.number),
+                TextField(
+                    controller: driverNameCtrl,
+                    decoration:
+                        const InputDecoration(labelText: 'Driver Name')),
+                TextField(
+                    controller: driverPhoneCtrl,
+                    decoration:
+                        const InputDecoration(labelText: 'Driver Phone')),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
-                  value: status,
+                  initialValue: status,
                   decoration: const InputDecoration(labelText: 'Status'),
                   items: ['Active', 'On Duty', 'Maintenance']
-                      .map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+                      .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                      .toList(),
                   onChanged: (val) => setS(() => status = val!),
                 ),
               ],
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+            TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel')),
             FilledButton(
               onPressed: () {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Bus updated successfully (Mock) ✓'), behavior: SnackBarBehavior.floating),
+                  const SnackBar(
+                      content: Text('Bus updated successfully (Mock) ✓'),
+                      behavior: SnackBarBehavior.floating),
                 );
                 Navigator.pop(context);
               },
@@ -251,20 +345,32 @@ class _AdminBusesState extends State<AdminBuses> {
       context: context,
       builder: (_) => StatefulBuilder(
         builder: (ctx, setS) => AlertDialog(
-          title: Text('Assign In-charge for ${bus.busNumber}', style: const TextStyle(fontWeight: FontWeight.w800)),
+          title: Text('Assign In-charge for ${bus.busNumber}',
+              style: const TextStyle(fontWeight: FontWeight.w800)),
           content: DropdownButtonFormField<String>(
-            value: selectedIncharge,
+            initialValue: selectedIncharge,
             decoration: const InputDecoration(labelText: 'In-charge'),
-            items: ['Meera Singh', 'Suresh Rao', 'Fatima Khan', 'Ranjit Verma', 'Lakshmi Pillai', 'None']
-                .map((i) => DropdownMenuItem(value: i, child: Text(i))).toList(),
+            items: [
+              'Meera Singh',
+              'Suresh Rao',
+              'Fatima Khan',
+              'Ranjit Verma',
+              'Lakshmi Pillai',
+              'None'
+            ].map((i) => DropdownMenuItem(value: i, child: Text(i))).toList(),
             onChanged: (val) => setS(() => selectedIncharge = val!),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+            TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel')),
             FilledButton(
               onPressed: () {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Assigned $selectedIncharge to ${bus.busNumber} (Mock) ✓'), behavior: SnackBarBehavior.floating),
+                  SnackBar(
+                      content: Text(
+                          'Assigned $selectedIncharge to ${bus.busNumber} (Mock) ✓'),
+                      behavior: SnackBarBehavior.floating),
                 );
                 Navigator.pop(context);
               },
@@ -281,23 +387,29 @@ class _AdminBusesState extends State<AdminBuses> {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: Text(toActivate ? 'Activate Bus' : 'Deactivate Bus', style: const TextStyle(fontWeight: FontWeight.w800)),
+        title: Text(toActivate ? 'Activate Bus' : 'Deactivate Bus',
+            style: const TextStyle(fontWeight: FontWeight.w800)),
         content: Text(toActivate
             ? 'Are you sure you want to activate ${bus.busNumber}?'
             : 'Are you sure you want to deactivate ${bus.busNumber}? It will be marked under maintenance.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel')),
           FilledButton(
             onPressed: () {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text('${bus.busNumber} status changed successfully (Mock) ✓'),
+                  content: Text(
+                      '${bus.busNumber} status changed successfully (Mock) ✓'),
                   behavior: SnackBarBehavior.floating,
                 ),
               );
               Navigator.pop(context);
             },
-            style: FilledButton.styleFrom(backgroundColor: toActivate ? AppColors.success : AppColors.danger),
+            style: FilledButton.styleFrom(
+                backgroundColor:
+                    toActivate ? AppColors.success : AppColors.danger),
             child: Text(toActivate ? 'Activate' : 'Deactivate'),
           ),
         ],

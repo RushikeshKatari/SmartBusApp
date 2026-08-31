@@ -1,5 +1,5 @@
 name: smartbus
-description: A premium mock-data SmartBus mobile frontend.
+description: SmartBus — College bus management system with student, in-charge, admin, and manager portals.
 publish_to: none
 version: 1.0.0+1
 
@@ -11,8 +11,8 @@ dependencies:
     sdk: flutter
   cupertino_icons: ^1.0.8
   provider: ^6.1.2
+  http: ^1.2.0
   google_fonts: ^6.2.1
-  google_maps_flutter: ^2.7.0
 
 dev_dependencies:
   flutter_test:
