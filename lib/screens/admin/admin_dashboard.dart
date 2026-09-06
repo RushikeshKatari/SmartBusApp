@@ -5,6 +5,8 @@ import '../../mock/mock_data.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/admin_widgets.dart';
 
+import 'admin_live_map_screen.dart';
+
 class AdminDashboard extends StatelessWidget {
   const AdminDashboard({super.key});
 
@@ -39,6 +41,24 @@ class AdminDashboard extends StatelessWidget {
                         style: const TextStyle(
                             color: AppColors.muted, fontSize: 14)),
                   ],
+                ),
+              ),
+              FilledButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const AdminLiveMapScreen()),
+                  );
+                },
+                icon: const Icon(Icons.map_rounded, size: 18),
+                label: const Text('Live Fleet Map (5 Routes)'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14)),
                 ),
               ),
             ],

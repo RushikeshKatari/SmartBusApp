@@ -5,7 +5,6 @@ import '../theme/app_theme.dart';
 import '../widgets/common_widgets.dart';
 import '../models/app_models.dart';
 import 'smart_alarm_sheet.dart';
-import 'location_scanner_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -13,8 +12,149 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.watch<SmartBusProvider>();
     final bus = p.assignedBus;
+    final breakdown = p.activeBreakdown;
+
     return Stack(children: [
       ListView(padding: const EdgeInsets.fromLTRB(20, 8, 20, 260), children: [
+        if (breakdown != null) ...[
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF991B1B), Color(0xFF7F1D1D)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x33DC2626),
+                  blurRadius: 16,
+                  offset: Offset(0, 6),
+                )
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.warning_amber_rounded,
+                          color: Colors.white, size: 22),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '🚨 ${breakdown.brokenBusNumber} Reported Breakdown',
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w900,
+                                fontSize: 14),
+                          ),
+                          Text(
+                            '${breakdown.reason} near ${breakdown.location}',
+                            style: const TextStyle(
+                                color: Colors.white70, fontSize: 11),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.black26,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.white24),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.directions_bus_filled_rounded,
+                              color: Color(0xFFFDE047), size: 20),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Catch Replacement: ${breakdown.assignedPickupBusNumber} (${breakdown.assignedPickupBusName})',
+                                  style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 12),
+                                ),
+                                Text(
+                                  'Driver: ${breakdown.assignedPickupDriver} (${breakdown.assignedPickupDriverPhone}) • Arriving in ~${breakdown.detourEtaMinutes} mins',
+                                  style: const TextStyle(
+                                      color: Color(0xFFFDE047), fontSize: 11),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF10B981).withValues(alpha: 0.25),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.verified_rounded,
+                                color: Color(0xFF34D399), size: 14),
+                            const SizedBox(width: 6),
+                            Text(
+                              'All ${breakdown.totalRemainingStops} remaining stops covered via U-turn diversion',
+                              style: const TextStyle(
+                                  color: Color(0xFF34D399),
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 10.5),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 4,
+                        runSpacing: 4,
+                        children: breakdown.affectedStopNames.map((st) => Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.white12,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            '✓ $st',
+                            style: const TextStyle(color: Colors.white70, fontSize: 9.5),
+                          ),
+                        )).toList(),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
         Text('Good morning, ${p.student.name.split(' ').first}',
             style: Theme.of(context)
                 .textTheme
@@ -23,31 +163,7 @@ class HomeScreen extends StatelessWidget {
         const SizedBox(height: 4),
         const Text('Your campus ride is on the move.',
             style: TextStyle(color: AppColors.muted)),
-        const SizedBox(height: 14),
-        SurfaceCard(
-            color: const Color(0xFFEFF6FF),
-            child: Row(children: [
-              const Icon(Icons.share_location_rounded,
-                  color: AppColors.primary),
-              const SizedBox(width: 11),
-              const Expanded(
-                  child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                    Text('Share bus location',
-                        style: TextStyle(fontWeight: FontWeight.w800)),
-                    Text('Help riders track this trip live.',
-                        style: TextStyle(fontSize: 12, color: AppColors.muted))
-                  ])),
-              IconButton(
-                  onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (_) => const LocationScannerScreen())),
-                  icon: const Icon(Icons.arrow_forward_rounded,
-                      color: AppColors.primary))
-            ])),
-        const SizedBox(height: 20),
+        const SizedBox(height: 18),
         SizedBox(
             height: 155,
             child: ListView.separated(

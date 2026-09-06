@@ -1,0 +1,1 @@
+package com.smartbus.operations.dto; import com.fasterxml.jackson.annotation.JsonAlias; import jakarta.validation.constraints.NotBlank; import java.util.UUID; public record EmergencyRequest(UUID busId, @JsonAlias("reason") @NotBlank String type, String details, String location) {}

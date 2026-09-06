@@ -16,15 +16,167 @@ class InchargeMyBus extends StatefulWidget {
 }
 
 class _InchargeMyBusState extends State<InchargeMyBus> {
+  String _selectedBusNumber = 'SB-04';
+
   @override
   Widget build(BuildContext context) {
-    const bus = MockData.meeraBus;
-    final provider = Provider.of<SmartBusProvider>(context, listen: false);
+    final provider = Provider.of<SmartBusProvider>(context);
+    final breakdown = provider.activeBreakdown;
+
+    final bus = provider.adminBuses.firstWhere(
+      (b) => b.busNumber == _selectedBusNumber,
+      orElse: () => MockData.meeraBus,
+    );
+
+    final activeRoute = provider.liveRoutes.firstWhere(
+      (r) => r.busNumber == _selectedBusNumber,
+      orElse: () => provider.liveRoutes.first,
+    );
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
       children: [
-        const _BusHeroCard(bus: bus),
+        if (breakdown != null) ...[
+          // Bus View Selector: Switch between Broken Bus and Diverted Rescue Bus
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                FilterChip(
+                  label: const Text('SB-04 (Broken Down)'),
+                  selected: _selectedBusNumber == 'SB-04',
+                  selectedColor: AppColors.danger.withValues(alpha: 0.2),
+                  onSelected: (_) =>
+                      setState(() => _selectedBusNumber = 'SB-04'),
+                ),
+                const SizedBox(width: 8),
+                FilterChip(
+                  label: Text(
+                      '${breakdown.assignedPickupBusNumber} (Diverted Rescue Bus)'),
+                  selected:
+                      _selectedBusNumber == breakdown.assignedPickupBusNumber,
+                  selectedColor:
+                      const Color(0xFFFBBF24).withValues(alpha: 0.25),
+                  onSelected: (_) => setState(() =>
+                      _selectedBusNumber = breakdown.assignedPickupBusNumber),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          if (_selectedBusNumber == breakdown.assignedPickupBusNumber)
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFB45309), Color(0xFF78350F)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(18),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x33F59E0B),
+                    blurRadius: 14,
+                    offset: Offset(0, 4),
+                  )
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.u_turn_left_rounded,
+                            color: Color(0xFFFDE047), size: 22),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              '🚨 U-Turn & Route Diversion Active',
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 13),
+                            ),
+                            Text(
+                              'Assigned ${breakdown.totalRemainingStops} stops from broken bus ${breakdown.brokenBusNumber}',
+                              style: const TextStyle(
+                                  color: Colors.white70, fontSize: 11),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Chip(
+                        label: Text(
+                          '+${breakdown.detourDistanceKm} km',
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800),
+                        ),
+                        backgroundColor: Colors.black26,
+                        padding: EdgeInsets.zero,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'Please execute U-turn diversion to visit remaining stops: ${breakdown.affectedStopNames.join(", ")}. All stops must be visited to ensure 100% student pickup.',
+                    style: const TextStyle(color: Colors.white, fontSize: 12),
+                  ),
+                ],
+              ),
+            )
+          else
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.danger.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                    color: AppColors.danger.withValues(alpha: 0.4)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.warning_amber_rounded,
+                      color: AppColors.danger, size: 24),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Bus SB-04 Reported Breakdown',
+                          style: TextStyle(
+                              color: AppColors.danger,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 13),
+                        ),
+                        Text(
+                          'All ${breakdown.totalRemainingStops} remaining stops reassigned to rescue bus ${breakdown.assignedPickupBusNumber}. 100% stops covered.',
+                          style: const TextStyle(
+                              color: Colors.black87, fontSize: 11),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          const SizedBox(height: 14),
+        ],
+        _BusHeroCard(bus: bus),
         const SizedBox(height: 12),
         ElevatedButton(
           style: ElevatedButton.styleFrom(
@@ -244,6 +396,157 @@ class _InchargeMyBusState extends State<InchargeMyBus> {
         const AdminSectionHeader(title: 'Live Location'),
         const SizedBox(height: 12),
         const MapPlaceholder(height: 220),
+        const SizedBox(height: 24),
+        Row(
+          children: [
+            const Expanded(
+                child: AdminSectionHeader(
+                    title: 'Assigned Stops & Pickup Schedule')),
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                '${activeRoute.stops.length} Stops Scheduled',
+                style: const TextStyle(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 11,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        ...activeRoute.stops.map((stop) => Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: stop.isDivertedPickup
+                    ? const Color(0xFFFEF3C7)
+                    : Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: stop.isDivertedPickup
+                      ? const Color(0xFFF59E0B)
+                      : const Color(0xFFE2E8F0),
+                  width: stop.isDivertedPickup ? 1.6 : 1.0,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: stop.isDivertedPickup
+                        ? const Color(0x22F59E0B)
+                        : const Color(0x05000000),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 15,
+                    backgroundColor: stop.isDivertedPickup
+                        ? const Color(0xFFF59E0B)
+                        : AppColors.primary.withValues(alpha: 0.15),
+                    child: Text(
+                      '${stop.order}',
+                      style: TextStyle(
+                        color: stop.isDivertedPickup
+                            ? Colors.white
+                            : AppColors.primary,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                stop.name,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 14,
+                                  color: stop.isDivertedPickup
+                                      ? const Color(0xFF92400E)
+                                      : AppColors.ink,
+                                ),
+                              ),
+                            ),
+                            if (stop.isDivertedPickup) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFD97706),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: const Text(
+                                  'DIVERTED PICKUP',
+                                  style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w900),
+                                ),
+                              ),
+                            ],
+                            if (stop.isUturnDetour) ...[
+                              const SizedBox(width: 4),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 5, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF7C3AED),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: const Text(
+                                  '↩️ U-TURN',
+                                  style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w900),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          stop.isDivertedPickup
+                              ? 'Diverted stop originally from ${stop.originalBusNumber ?? "SB-04"} • ~5 stranded students waiting'
+                              : '${stop.landmark} • Regular scheduled stop',
+                          style: TextStyle(
+                            color: stop.isDivertedPickup
+                                ? const Color(0xFFB45309)
+                                : AppColors.muted,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    stop.isDivertedPickup
+                        ? Icons.alt_route_rounded
+                        : Icons.check_circle_outline_rounded,
+                    color: stop.isDivertedPickup
+                        ? const Color(0xFFD97706)
+                        : AppColors.muted,
+                    size: 20,
+                  ),
+                ],
+              ),
+            )),
       ],
     );
   }

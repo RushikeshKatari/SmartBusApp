@@ -10,8 +10,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:smartbus/main.dart';
 
 void main() {
-  testWidgets('SmartBus home renders', (WidgetTester tester) async {
+  testWidgets('role selection screen renders', (WidgetTester tester) async {
     await tester.pumpWidget(const SmartBusApp());
-    expect(find.text('SmartBus'), findsOneWidget);
+    expect(find.text('Welcome to SmartBus'), findsOneWidget);
+    expect(find.text('HOD Portal'), findsOneWidget);
   });
 }

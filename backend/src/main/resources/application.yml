@@ -6,9 +6,16 @@ spring:
   jpa:
     hibernate.ddl-auto: validate
     open-in-view: false
+  flyway:
+    enabled: true
 server:
   error:
     include-message: never
 smartbus:
   jwt-secret: ${JWT_SECRET}
   jwt-ttl-hours: 168
+  cors-origins: ${CORS_ORIGINS:http://localhost:*,http://127.0.0.1:*}
+  bootstrap-manager-username: ${BOOTSTRAP_MANAGER_USERNAME:superadmin}
+  bootstrap-manager-password: ${BOOTSTRAP_MANAGER_PASSWORD:admin123}
+  bootstrap-hod-username: ${BOOTSTRAP_HOD_USERNAME:hod}
+  bootstrap-hod-password: ${BOOTSTRAP_HOD_PASSWORD:hod123}

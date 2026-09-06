@@ -4,6 +4,7 @@ import '../widgets/common_widgets.dart';
 import 'admin/admin_shell.dart';
 import 'incharge/incharge_shell.dart';
 import 'manager/manager_shell.dart';
+import 'hod/hod_login_screen.dart';
 import 'smart_bus_shell.dart';
 
 class RoleSelectionScreen extends StatelessWidget {
@@ -51,6 +52,19 @@ class RoleSelectionScreen extends StatelessWidget {
                                   runSpacing: 16,
                                   alignment: WrapAlignment.center,
                                   children: [
+                                    SizedBox(
+                                        width: constraints.maxWidth > 650
+                                            ? 250
+                                            : constraints.maxWidth,
+                                        child: _RoleCard(
+                                            icon: Icons.account_balance_rounded,
+                                            title: 'HOD Portal',
+                                            description:
+                                                'Review emergency attendance lists forwarded by transport.',
+                                            color: const Color(0xFF0F766E),
+                                            action: 'Open HOD portal',
+                                            onOpen: () => _open(context,
+                                                const HodLoginScreen()))),
                                     SizedBox(
                                         width: constraints.maxWidth > 650
                                             ? 250

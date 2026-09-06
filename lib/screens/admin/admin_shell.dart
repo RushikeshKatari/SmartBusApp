@@ -13,7 +13,9 @@ import 'admin_reports.dart';
 import 'admin_attendance.dart';
 import 'admin_qr_scanner.dart';
 import 'admin_settings.dart';
+import 'admin_live_map_screen.dart';
 import 'admin_emergency.dart';
+import '../role_selection_screen.dart';
 
 class AdminShell extends StatefulWidget {
   const AdminShell({super.key});
@@ -26,6 +28,7 @@ class _AdminShellState extends State<AdminShell> {
 
   static const _navItems = [
     _NavItem(Icons.dashboard_rounded, Icons.dashboard_outlined, 'Dashboard'),
+    _NavItem(Icons.map_rounded, Icons.map_outlined, 'Live Fleet Map'),
     _NavItem(Icons.people_alt_rounded, Icons.people_alt_outlined, 'Students'),
     _NavItem(Icons.manage_accounts_rounded, Icons.manage_accounts_outlined,
         'Bus Incharges'),
@@ -48,26 +51,28 @@ class _AdminShellState extends State<AdminShell> {
       case 0:
         return const AdminDashboard(key: ValueKey('dash'));
       case 1:
-        return const AdminStudents(key: ValueKey('students'));
+        return const AdminLiveMapScreen(key: ValueKey('livemap'));
       case 2:
-        return const AdminIncharges(key: ValueKey('incharges'));
+        return const AdminStudents(key: ValueKey('students'));
       case 3:
-        return const AdminBuses(key: ValueKey('buses'));
+        return const AdminIncharges(key: ValueKey('incharges'));
       case 4:
-        return const AdminRoutes(key: ValueKey('routes'));
+        return const AdminBuses(key: ValueKey('buses'));
       case 5:
-        return const AdminAdvertisements(key: ValueKey('ads'));
+        return const AdminRoutes(key: ValueKey('routes'));
       case 6:
-        return const AdminNotifications(key: ValueKey('notif'));
+        return const AdminAdvertisements(key: ValueKey('ads'));
       case 7:
-        return const AdminAttendance(key: ValueKey('attd'));
+        return const AdminNotifications(key: ValueKey('notif'));
       case 8:
-        return const AdminQrScanner(key: ValueKey('scanner'));
+        return const AdminAttendance(key: ValueKey('attd'));
       case 9:
-        return const AdminReports(key: ValueKey('reports'));
+        return const AdminQrScanner(key: ValueKey('scanner'));
       case 10:
-        return const AdminEmergency(key: ValueKey('emergency'));
+        return const AdminReports(key: ValueKey('reports'));
       case 11:
+        return const AdminEmergency(key: ValueKey('emergency'));
+      case 12:
         return const AdminSettings(key: ValueKey('settings'));
       default:
         return const AdminDashboard(key: ValueKey('dash'));
@@ -187,6 +192,18 @@ class _AdminShellState extends State<AdminShell> {
                           ],
                         ),
                       ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        icon: const Icon(Icons.logout_rounded,
+                            color: AppColors.danger),
+                        tooltip: 'Logout / Switch Portal',
+                        onPressed: () =>
+                            Navigator.of(context).pushAndRemoveUntil(
+                          MaterialPageRoute(
+                              builder: (_) => const RoleSelectionScreen()),
+                          (route) => false,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -253,10 +270,10 @@ class _AdminShellState extends State<AdminShell> {
               onPressed: () => Navigator.pop(context),
               child: const Text('Close')),
           FilledButton(
-            onPressed: () {
-              Navigator.pop(context);
-              Navigator.pop(context);
-            },
+            onPressed: () => Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (_) => const RoleSelectionScreen()),
+              (route) => false,
+            ),
             style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
             child: const Text('Logout'),
           ),
@@ -358,15 +375,19 @@ class _Sidebar extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.all(16),
               child: ListTile(
-                onTap: () => Navigator.pop(context),
+                onTap: () => Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(
+                      builder: (_) => const RoleSelectionScreen()),
+                  (route) => false,
+                ),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12)),
                 leading: const Icon(Icons.logout_rounded,
-                    color: Color(0xFF94A3B8), size: 20),
+                    color: Color(0xFFEF4444), size: 20),
                 title: const Text('Logout',
                     style: TextStyle(
-                        color: Color(0xFF94A3B8),
-                        fontWeight: FontWeight.w500,
+                        color: Color(0xFFEF4444),
+                        fontWeight: FontWeight.w600,
                         fontSize: 14)),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 14),
                 dense: true,

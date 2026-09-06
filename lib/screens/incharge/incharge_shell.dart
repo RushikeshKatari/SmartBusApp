@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
+import '../role_selection_screen.dart';
 import 'incharge_dashboard.dart';
 import 'incharge_my_bus.dart';
 import 'incharge_qr_scanner.dart';
@@ -35,6 +36,14 @@ class _InchargeShellState extends State<InchargeShell> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.logout_rounded, color: AppColors.muted),
+          tooltip: 'Logout / Switch Portal',
+          onPressed: () => Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const RoleSelectionScreen()),
+            (route) => false,
+          ),
+        ),
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -54,6 +63,14 @@ class _InchargeShellState extends State<InchargeShell> {
         ),
         centerTitle: false,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.logout_rounded, color: AppColors.danger),
+            tooltip: 'Logout / Switch Portal',
+            onPressed: () => Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (_) => const RoleSelectionScreen()),
+              (route) => false,
+            ),
+          ),
           Padding(
             padding: const EdgeInsets.only(right: 16),
             child: CircleAvatar(

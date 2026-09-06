@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import '../../providers/smart_bus_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/common_widgets.dart';
-import '../../services/manager_api_service.dart';
 import '../../screens/admin/admin_emergency.dart';
 
 class InchargeQrScanner extends StatefulWidget {
@@ -43,14 +42,23 @@ class _InchargeQrScannerState extends State<InchargeQrScanner> {
                   title: Text(reason),
                   onTap: () {
                     provider.setBreakdownReason(reason);
-                    ManagerApiService.sendEmergencyReport({
-                      'reason': reason,
-                      'busNumber': 'SB-04',
-                      'busName': 'Campus Express 04',
-                      'inchargeName': 'Incharge',
-                      'location': 'Campus',
-                    });
+                    provider.triggerAutomatedBreakdownReroute(
+                      busNumber: 'SB-04',
+                      busName: 'Campus Express',
+                      inchargeName: 'Meera Singh',
+                      reason: reason,
+                      location: 'Tech Park Gate (2 km)',
+                      strandedStudentsCount: 15,
+                    );
                     Navigator.of(ctx).pop();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                            'Emergency ($reason) reported. Auto-assigned SB-12 for pickup!'),
+                        backgroundColor: AppColors.danger,
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
                   },
                 );
               },
@@ -208,12 +216,37 @@ class _InchargeQrScannerState extends State<InchargeQrScanner> {
                     ),
                   ),
                   const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.qr_code_2_rounded),
+                      label: const Text('Simulate Scan: Aarav Sharma (CS2024-117)'),
+                      onPressed: () {
+                        provider.addAttendanceRecord(
+                            'CS2024-117', 'Aarav Sharma', 'Campus Express 04');
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                                '✓ QR Attendance Logged: Aarav Sharma (CS2024-117) marked BOARDED'),
+                            behavior: SnackBarBehavior.floating,
+                            backgroundColor: AppColors.success,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
                 ],
               ),
             ),
             if (provider.breakdownReason != null) ...[
               FilledButton(
                 onPressed: () {
+                  provider.submitBreakdownReport(
+                    busNumber: 'SB-04',
+                    busName: 'Campus Express 04',
+                    inchargeName: 'Incharge',
+                    location: 'Campus',
+                  );
                   Navigator.push(
                     context,
                     MaterialPageRoute(builder: (_) => const AdminEmergency()),

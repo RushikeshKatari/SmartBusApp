@@ -3,13 +3,10 @@ package com.smartbus.auth.service;
 import com.smartbus.auth.dto.*;
 import com.smartbus.auth.entity.*;
 import com.smartbus.auth.repository.*;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.security.Keys;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import javax.crypto.SecretKey;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
@@ -20,17 +17,17 @@ public class QrAuthService {
     
     private final LoginQrTokenRepository tokens;
     private final AuthSessionRepository sessions;
-    private final SecretKey key;
-    private final long jwtTtlHours;
+    private final StudentRepository students;
+    private final JwtService jwtService;
 
     public QrAuthService(LoginQrTokenRepository tokens, 
                          AuthSessionRepository sessions,
-                         @Value("${smartbus.jwt-secret}") String secret,
-                         @Value("${smartbus.jwt-ttl-hours}") long jwtTtlHours) {
+                         StudentRepository students,
+                         JwtService jwtService) {
         this.tokens = tokens;
         this.sessions = sessions;
-        this.key = Keys.hmacShaKeyFor(secret.getBytes());
-        this.jwtTtlHours = jwtTtlHours;
+        this.students = students;
+        this.jwtService = jwtService;
     }
 
     @Transactional
@@ -47,6 +44,9 @@ public class QrAuthService {
                 
         if (qr.used) {
             throw new IllegalStateException("This login QR has already been used");
+        }
+        if (qr.expiresAt.isBefore(Instant.now())) {
+            throw new IllegalStateException("This login QR has expired");
         }
         if (!"ACTIVE".equals(qr.student.status) || !qr.student.telegramEnabled) {
             throw new IllegalStateException("Student access is disabled");
@@ -70,18 +70,24 @@ public class QrAuthService {
         sessions.save(session);
         
         // Sign JWT
-        String jwt = Jwts.builder()
-                .subject(qr.student.id.toString())
-                .claim("role", "STUDENT")
-                .claim("sessionId", session.id.toString())
-                .issuedAt(Date.from(Instant.now()))
-                .expiration(Date.from(Instant.now().plus(jwtTtlHours, ChronoUnit.HOURS)))
-                .signWith(key)
-                .compact();
+        String jwt = jwtService.issue(qr.student.id.toString(), "STUDENT", session.id.toString());
 
         return new AuthResponse(jwt, new AuthResponse.StudentProfile(
                 qr.student.name, 
                 qr.student.rollNo, 
                 qr.student.department));
+    }
+
+    /** Issues a one-time login token. Tokens are deliberately opaque UUIDs, not JWTs. */
+    @Transactional
+    public QrTokenResponse issue(UUID studentId, long telegramChatId) {
+        tokens.invalidateUnused(studentId);
+        LoginQrToken qr = new LoginQrToken();
+        qr.id = UUID.randomUUID();
+        qr.student = students.findById(studentId).orElseThrow(() -> new IllegalArgumentException("Student not found"));
+        qr.token = UUID.randomUUID(); qr.telegramChatId = telegramChatId;
+        qr.createdAt = Instant.now(); qr.expiresAt = qr.createdAt.plus(10, ChronoUnit.MINUTES); qr.used = false;
+        tokens.save(qr);
+        return new QrTokenResponse(qr.token, qr.expiresAt);
     }
 }

@@ -2,6 +2,7 @@ import 'package:provider/provider.dart';
 import 'package:flutter/material.dart';
 import '../../providers/smart_bus_provider.dart';
 import '../../theme/app_theme.dart';
+import '../role_selection_screen.dart';
 import 'manager_dashboard.dart';
 import 'manager_service_billing.dart';
 import 'manager_configs.dart';
@@ -93,6 +94,18 @@ class _ManagerShellState extends State<ManagerShell> {
                                 color: Colors.white,
                                 fontWeight: FontWeight.w800,
                                 fontSize: 12)),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        icon: const Icon(Icons.logout_rounded,
+                            color: AppColors.danger),
+                        tooltip: 'Logout / Switch Portal',
+                        onPressed: () =>
+                            Navigator.of(context).pushAndRemoveUntil(
+                          MaterialPageRoute(
+                              builder: (_) => const RoleSelectionScreen()),
+                          (route) => false,
+                        ),
                       ),
                     ],
                   ),
@@ -213,12 +226,25 @@ class _Sidebar extends StatelessWidget {
                 },
               ),
             ),
-            ListTile(
-              onTap: () => Navigator.pop(context),
-              leading: const Icon(Icons.logout_rounded,
-                  color: Color(0xFF94A3B8), size: 20),
-              title: const Text('Logout',
-                  style: TextStyle(color: Color(0xFF94A3B8))),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: ListTile(
+                onTap: () => Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(
+                      builder: (_) => const RoleSelectionScreen()),
+                  (route) => false,
+                ),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+                leading: const Icon(Icons.logout_rounded,
+                    color: Color(0xFFEF4444), size: 20),
+                title: const Text('Logout',
+                    style: TextStyle(
+                        color: Color(0xFFEF4444),
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14)),
+                dense: true,
+              ),
             ),
             const SizedBox(height: 16)
           ],

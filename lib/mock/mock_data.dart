@@ -196,4 +196,113 @@ class MockData {
   // Routes submitted by Meera
   static List<RouteRecord> get meeraRoutes =>
       routeRecords.where((r) => r.inchargeId == 'I001').toList();
+
+  // ─────────────────────────────────────────────
+  // 5 COMPLETE LIVE ROUTES (~1 km stop spacing)
+  // ─────────────────────────────────────────────
+  static final List<LiveBusRoute> liveBusRoutes = [
+    // Route 1: North Campus Express (Blue)
+    const LiveBusRoute(
+      id: 'RTE-01',
+      routeNumber: 'Route 1',
+      name: 'North Campus Express',
+      busNumber: 'SB-04',
+      busName: 'Campus Express',
+      driverName: 'Ravi Kumar',
+      driverPhone: '+91 98765 43210',
+      color: Color(0xFF2563EB),
+      totalDistanceKm: 5.2,
+      totalDurationMinutes: 18,
+      stops: [
+        LiveRouteStop(id: 'STP-101', name: 'North Terminal', landmark: 'Main Gate Gate 1', latitude: 12.9800, longitude: 77.5800, order: 1, distanceFromPreviousKm: 0.0, estimatedArrivalMinutes: 0),
+        LiveRouteStop(id: 'STP-102', name: 'Library Circle', landmark: 'Near Central Library', latitude: 12.9730, longitude: 77.5840, order: 2, distanceFromPreviousKm: 1.0, estimatedArrivalMinutes: 4),
+        LiveRouteStop(id: 'STP-103', name: 'Tech Park Gate', landmark: 'Opp. IT Incubator', latitude: 12.9660, longitude: 77.5880, order: 3, distanceFromPreviousKm: 1.0, estimatedArrivalMinutes: 8),
+        LiveRouteStop(id: 'STP-104', name: 'North Hostel', landmark: 'Boys Hostel Complex', latitude: 12.9590, longitude: 77.5920, order: 4, distanceFromPreviousKm: 1.0, estimatedArrivalMinutes: 12),
+        LiveRouteStop(id: 'STP-105', name: 'Sports Complex', landmark: 'Near Stadium', latitude: 12.9520, longitude: 77.5960, order: 5, distanceFromPreviousKm: 1.0, estimatedArrivalMinutes: 15),
+        LiveRouteStop(id: 'STP-106', name: 'Campus Gate', landmark: 'Central Dropoff', latitude: 12.9450, longitude: 77.6000, order: 6, distanceFromPreviousKm: 1.2, estimatedArrivalMinutes: 18),
+      ],
+    ),
+    // Route 2: West City Connector (Purple)
+    const LiveBusRoute(
+      id: 'RTE-02',
+      routeNumber: 'Route 2',
+      name: 'West City Connector',
+      busNumber: 'SB-12',
+      busName: 'City Connector',
+      driverName: 'Imran Khan',
+      driverPhone: '+91 87654 32109',
+      color: Color(0xFF7C3AED),
+      totalDistanceKm: 4.8,
+      totalDurationMinutes: 16,
+      stops: [
+        LiveRouteStop(id: 'STP-201', name: 'West Metro', landmark: 'Exit 2 Station', latitude: 12.9450, longitude: 77.5500, order: 1, distanceFromPreviousKm: 0.0, estimatedArrivalMinutes: 0),
+        LiveRouteStop(id: 'STP-202', name: 'City Market', landmark: 'Commercial Street', latitude: 12.9450, longitude: 77.5620, order: 2, distanceFromPreviousKm: 1.1, estimatedArrivalMinutes: 4),
+        LiveRouteStop(id: 'STP-203', name: 'West Hostel', landmark: 'Girls Hostel B', latitude: 12.9450, longitude: 77.5740, order: 3, distanceFromPreviousKm: 1.1, estimatedArrivalMinutes: 8),
+        LiveRouteStop(id: 'STP-204', name: 'Innovation Sq', landmark: 'R&D Block', latitude: 12.9450, longitude: 77.5860, order: 4, distanceFromPreviousKm: 1.2, estimatedArrivalMinutes: 12),
+        LiveRouteStop(id: 'STP-205', name: 'Campus Gate', landmark: 'Central Dropoff', latitude: 12.9450, longitude: 77.6000, order: 5, distanceFromPreviousKm: 1.4, estimatedArrivalMinutes: 16),
+      ],
+    ),
+    // Route 3: South Campus Loop (Green)
+    const LiveBusRoute(
+      id: 'RTE-03',
+      routeNumber: 'Route 3',
+      name: 'South Campus Loop',
+      busNumber: 'SB-09',
+      busName: 'Green Line',
+      driverName: 'Nisha Patel',
+      driverPhone: '+91 76543 21098',
+      color: Color(0xFF10B981),
+      totalDistanceKm: 4.9,
+      totalDurationMinutes: 15,
+      stops: [
+        LiveRouteStop(id: 'STP-301', name: 'South Junction', landmark: 'Outer Ring Junction', latitude: 12.9100, longitude: 77.6000, order: 1, distanceFromPreviousKm: 0.0, estimatedArrivalMinutes: 0),
+        LiveRouteStop(id: 'STP-302', name: 'Medical Block', landmark: 'Hospital Wing', latitude: 12.9190, longitude: 77.6000, order: 2, distanceFromPreviousKm: 1.0, estimatedArrivalMinutes: 4),
+        LiveRouteStop(id: 'STP-303', name: 'Research Park', landmark: 'Biotech Labs', latitude: 12.9280, longitude: 77.6000, order: 3, distanceFromPreviousKm: 1.0, estimatedArrivalMinutes: 7),
+        LiveRouteStop(id: 'STP-304', name: 'Botanical Garden', landmark: 'Clock Tower Gate', latitude: 12.9370, longitude: 77.6000, order: 4, distanceFromPreviousKm: 1.0, estimatedArrivalMinutes: 11),
+        LiveRouteStop(id: 'STP-305', name: 'Campus Gate', landmark: 'Central Dropoff', latitude: 12.9450, longitude: 77.6000, order: 5, distanceFromPreviousKm: 0.9, estimatedArrivalMinutes: 15),
+      ],
+    ),
+    // Route 4: East Corridor Line (Amber/Orange)
+    const LiveBusRoute(
+      id: 'RTE-04',
+      routeNumber: 'Route 4',
+      name: 'East Corridor Line',
+      busNumber: 'SB-02',
+      busName: 'Blue Arrow',
+      driverName: 'Suresh Rao',
+      driverPhone: '+91 65432 10987',
+      color: Color(0xFFF59E0B),
+      totalDistanceKm: 5.1,
+      totalDurationMinutes: 17,
+      stops: [
+        LiveRouteStop(id: 'STP-401', name: 'East Tech Hub', landmark: 'Software Complex', latitude: 12.9450, longitude: 77.6500, order: 1, distanceFromPreviousKm: 0.0, estimatedArrivalMinutes: 0),
+        LiveRouteStop(id: 'STP-402', name: 'Engineering Block', landmark: 'Dept of Civil & Mech', latitude: 12.9450, longitude: 77.6380, order: 2, distanceFromPreviousKm: 1.2, estimatedArrivalMinutes: 4),
+        LiveRouteStop(id: 'STP-403', name: 'East Lake Point', landmark: 'Boating Club Circle', latitude: 12.9450, longitude: 77.6260, order: 3, distanceFromPreviousKm: 1.2, estimatedArrivalMinutes: 8),
+        LiveRouteStop(id: 'STP-404', name: 'Polytechnic', landmark: 'Vocational Center', latitude: 12.9450, longitude: 77.6140, order: 4, distanceFromPreviousKm: 1.3, estimatedArrivalMinutes: 13),
+        LiveRouteStop(id: 'STP-405', name: 'Campus Gate', landmark: 'Central Dropoff', latitude: 12.9450, longitude: 77.6000, order: 5, distanceFromPreviousKm: 1.4, estimatedArrivalMinutes: 17),
+      ],
+    ),
+    // Route 5: Outer Ring Shuttle (Rose/Pink)
+    const LiveBusRoute(
+      id: 'RTE-05',
+      routeNumber: 'Route 5',
+      name: 'Outer Ring Shuttle',
+      busNumber: 'SB-17',
+      busName: 'North Shuttle',
+      driverName: 'Priya Rao',
+      driverPhone: '+91 54321 09876',
+      color: Color(0xFFEC4899),
+      totalDistanceKm: 5.5,
+      totalDurationMinutes: 19,
+      stops: [
+        LiveRouteStop(id: 'STP-501', name: 'Suburban Heights', landmark: 'Terminal Station', latitude: 12.9750, longitude: 77.6350, order: 1, distanceFromPreviousKm: 0.0, estimatedArrivalMinutes: 0),
+        LiveRouteStop(id: 'STP-502', name: 'Innovation East', landmark: 'Incubation Wing', latitude: 12.9680, longitude: 77.6280, order: 2, distanceFromPreviousKm: 1.0, estimatedArrivalMinutes: 4),
+        LiveRouteStop(id: 'STP-503', name: 'Faculty Enclave', landmark: 'Staff Residences', latitude: 12.9610, longitude: 77.6210, order: 3, distanceFromPreviousKm: 1.1, estimatedArrivalMinutes: 8),
+        LiveRouteStop(id: 'STP-504', name: 'Observatory Cir', landmark: 'Science Block', latitude: 12.9540, longitude: 77.6140, order: 4, distanceFromPreviousKm: 1.1, estimatedArrivalMinutes: 12),
+        LiveRouteStop(id: 'STP-505', name: 'Auditorium', landmark: 'Main Convocation Hall', latitude: 12.9480, longitude: 77.6070, order: 5, distanceFromPreviousKm: 1.1, estimatedArrivalMinutes: 15),
+        LiveRouteStop(id: 'STP-506', name: 'Campus Gate', landmark: 'Central Dropoff', latitude: 12.9450, longitude: 77.6000, order: 6, distanceFromPreviousKm: 1.2, estimatedArrivalMinutes: 19),
+      ],
+    ),
+  ];
 }
+

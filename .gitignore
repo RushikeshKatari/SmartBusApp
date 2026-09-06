@@ -50,3 +50,7 @@ flutter_*.log
 
 # Gemini / AI tooling
 .gemini/
+
+# Backend Maven build target
+**/target/
+backend/target/
