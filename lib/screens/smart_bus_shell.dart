@@ -8,7 +8,7 @@ import 'routes_screen.dart';
 import 'notifications_screen.dart';
 import 'profile_screen.dart';
 
-import 'role_selection_screen.dart';
+import 'login_screen.dart';
 
 class SmartBusShell extends StatelessWidget {
   const SmartBusShell({super.key});
@@ -20,9 +20,9 @@ class SmartBusShell extends StatelessWidget {
       appBar: AppBar(
           leading: IconButton(
             icon: const Icon(Icons.logout_rounded, color: AppColors.muted),
-            tooltip: 'Logout / Switch Role',
+            tooltip: 'Logout',
             onPressed: () => Navigator.of(context).pushAndRemoveUntil(
-              MaterialPageRoute(builder: (_) => const RoleSelectionScreen()),
+              MaterialPageRoute(builder: (_) => const SingleLoginScreen()),
               (route) => false,
             ),
           ),

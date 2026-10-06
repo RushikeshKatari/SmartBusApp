@@ -44,18 +44,15 @@ class ProfileScreen extends StatelessWidget {
         children: [
           // Student Avatar and Name Header
           Center(
-            child: Hero(
-              tag: 'avatar',
-              child: CircleAvatar(
-                radius: 40,
-                backgroundColor: AppColors.primary,
-                child: Text(
-                  s.initials,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.w800,
-                  ),
+            child: CircleAvatar(
+              radius: 40,
+              backgroundColor: AppColors.primary,
+              child: Text(
+                s.initials,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 24,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
             ),

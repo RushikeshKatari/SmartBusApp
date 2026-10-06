@@ -15,7 +15,7 @@ import 'admin_qr_scanner.dart';
 import 'admin_settings.dart';
 import 'admin_live_map_screen.dart';
 import 'admin_emergency.dart';
-import '../role_selection_screen.dart';
+import '../login_screen.dart';
 
 class AdminShell extends StatefulWidget {
   const AdminShell({super.key});
@@ -196,11 +196,11 @@ class _AdminShellState extends State<AdminShell> {
                       IconButton(
                         icon: const Icon(Icons.logout_rounded,
                             color: AppColors.danger),
-                        tooltip: 'Logout / Switch Portal',
+                        tooltip: 'Logout',
                         onPressed: () =>
                             Navigator.of(context).pushAndRemoveUntil(
                           MaterialPageRoute(
-                              builder: (_) => const RoleSelectionScreen()),
+                              builder: (_) => const SingleLoginScreen()),
                           (route) => false,
                         ),
                       ),
@@ -271,7 +271,7 @@ class _AdminShellState extends State<AdminShell> {
               child: const Text('Close')),
           FilledButton(
             onPressed: () => Navigator.of(context).pushAndRemoveUntil(
-              MaterialPageRoute(builder: (_) => const RoleSelectionScreen()),
+              MaterialPageRoute(builder: (_) => const SingleLoginScreen()),
               (route) => false,
             ),
             style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
@@ -294,11 +294,12 @@ class _Sidebar extends StatelessWidget {
   static const _navItems = _AdminShellState._navItems;
 
   @override
-  Widget build(BuildContext context) => Container(
-        width: 240,
+  Widget build(BuildContext context) => Material(
         color: const Color(0xFF0F172A),
-        child: Column(
-          children: [
+        child: SizedBox(
+          width: 240,
+          child: Column(
+            children: [
             // Logo area
             Container(
               padding: const EdgeInsets.fromLTRB(20, 28, 20, 20),
@@ -377,7 +378,7 @@ class _Sidebar extends StatelessWidget {
               child: ListTile(
                 onTap: () => Navigator.of(context).pushAndRemoveUntil(
                   MaterialPageRoute(
-                      builder: (_) => const RoleSelectionScreen()),
+                      builder: (_) => const SingleLoginScreen()),
                   (route) => false,
                 ),
                 shape: RoundedRectangleBorder(
@@ -395,7 +396,8 @@ class _Sidebar extends StatelessWidget {
             ),
           ],
         ),
-      );
+      ),
+    );
 }
 
 class _NavItem {

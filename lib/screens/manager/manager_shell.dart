@@ -1,8 +1,8 @@
-import 'package:provider/provider.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../providers/smart_bus_provider.dart';
 import '../../theme/app_theme.dart';
-import '../role_selection_screen.dart';
+import '../login_screen.dart';
 import 'manager_dashboard.dart';
 import 'manager_service_billing.dart';
 import 'manager_configs.dart';
@@ -99,11 +99,11 @@ class _ManagerShellState extends State<ManagerShell> {
                       IconButton(
                         icon: const Icon(Icons.logout_rounded,
                             color: AppColors.danger),
-                        tooltip: 'Logout / Switch Portal',
+                        tooltip: 'Logout',
                         onPressed: () =>
                             Navigator.of(context).pushAndRemoveUntil(
                           MaterialPageRoute(
-                              builder: (_) => const RoleSelectionScreen()),
+                              builder: (_) => const SingleLoginScreen()),
                           (route) => false,
                         ),
                       ),
@@ -154,12 +154,13 @@ class _Sidebar extends StatelessWidget {
   static const _navItems = _ManagerShellState._navItems;
 
   @override
-  Widget build(BuildContext context) => Container(
-        width: 240,
+  Widget build(BuildContext context) => Material(
         color: const Color(0xFF1E140C),
-        child: Column(
-          children: [
-            Container(
+        child: SizedBox(
+          width: 240,
+          child: Column(
+            children: [
+              Container(
               padding: const EdgeInsets.fromLTRB(20, 28, 20, 20),
               child: Row(
                 children: [
@@ -231,7 +232,7 @@ class _Sidebar extends StatelessWidget {
               child: ListTile(
                 onTap: () => Navigator.of(context).pushAndRemoveUntil(
                   MaterialPageRoute(
-                      builder: (_) => const RoleSelectionScreen()),
+                      builder: (_) => const SingleLoginScreen()),
                   (route) => false,
                 ),
                 shape: RoundedRectangleBorder(
@@ -246,10 +247,11 @@ class _Sidebar extends StatelessWidget {
                 dense: true,
               ),
             ),
-            const SizedBox(height: 16)
+            const SizedBox(height: 16),
           ],
         ),
-      );
+      ),
+    );
 }
 
 class _NavItem {

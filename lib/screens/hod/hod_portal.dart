@@ -7,7 +7,7 @@ import '../../models/app_models.dart';
 import '../../providers/smart_bus_provider.dart';
 import '../../services/hod_api_service.dart';
 import '../../theme/app_theme.dart';
-import '../role_selection_screen.dart';
+import '../login_screen.dart';
 
 class HodPortal extends StatefulWidget {
   const HodPortal({super.key});
@@ -75,10 +75,10 @@ class _HodPortalState extends State<HodPortal> {
               const SizedBox(width: 8),
               IconButton(
                 icon: const Icon(Icons.logout_rounded, color: AppColors.danger),
-                tooltip: 'Logout / Switch Portal',
+                tooltip: 'Logout',
                 onPressed: () => Navigator.of(context).pushAndRemoveUntil(
                   MaterialPageRoute(
-                      builder: (_) => const RoleSelectionScreen()),
+                      builder: (_) => const SingleLoginScreen()),
                   (route) => false,
                 ),
               ),
@@ -334,11 +334,12 @@ class _HodSidebar extends StatelessWidget {
     Icons.emergency_outlined,
   ];
   @override
-  Widget build(BuildContext context) => Container(
-        width: 240,
+  Widget build(BuildContext context) => Material(
         color: const Color(0xFF123A36),
-        child: Column(children: [
-          Container(
+        child: SizedBox(
+          width: 240,
+          child: Column(children: [
+            Container(
               padding: const EdgeInsets.fromLTRB(20, 28, 20, 20),
               child: const Row(children: [
                 _HodBrandIcon(),
@@ -415,7 +416,7 @@ class _HodSidebar extends StatelessWidget {
             child: ListTile(
               onTap: () => Navigator.of(context).pushAndRemoveUntil(
                 MaterialPageRoute(
-                    builder: (_) => const RoleSelectionScreen()),
+                    builder: (_) => const SingleLoginScreen()),
                 (route) => false,
               ),
               shape: RoundedRectangleBorder(
@@ -432,7 +433,8 @@ class _HodSidebar extends StatelessWidget {
             ),
           ),
         ]),
-      );
+      ),
+    );
 }
 
 class _HodBrandIcon extends StatelessWidget {
