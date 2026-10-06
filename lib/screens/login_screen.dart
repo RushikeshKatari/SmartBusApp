@@ -256,13 +256,15 @@ class _SingleLoginScreenState extends State<SingleLoginScreen> {
                                   Icon(Icons.vpn_key_outlined,
                                       size: 15, color: AppColors.muted),
                                   SizedBox(width: 6),
-                                  Text(
-                                    'Demo Credentials (1-Tap Fill):',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
-                                      color: AppColors.muted,
-                                      letterSpacing: 0.2,
+                                  Expanded(
+                                    child: Text(
+                                      'Demo Credentials (1-Tap Fill):',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.muted,
+                                        letterSpacing: 0.2,
+                                      ),
                                     ),
                                   ),
                                 ],

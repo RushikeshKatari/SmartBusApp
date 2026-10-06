@@ -54,3 +54,8 @@ flutter_*.log
 # Backend Maven build target
 **/target/
 backend/target/
+
+# Environment files
+.env
+.env.*
+!.env.example

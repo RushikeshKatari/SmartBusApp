@@ -1,8 +1,9 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../config/app_config.dart';
 
 class ManagerApiService {
-  static const String baseUrl = 'http://localhost:8080/api/manager';
+  static String get baseUrl => AppConfig.endpoint('/api/manager');
   static String? _jwtToken;
 
   static Future<bool> login(String username, String password) async {

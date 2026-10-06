@@ -26,7 +26,7 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable()).cors(cors -> {})
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/auth/**", "/auth/**", "/api/manager/login", "/ws/**", "/actuator/health").permitAll()
+                .requestMatchers("/health", "/api/auth/**", "/auth/**", "/api/manager/login", "/ws/**", "/actuator/health").permitAll()
                 .requestMatchers("/api/manager/**").hasRole("APP_MANAGER")
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .requestMatchers("/api/incharge/**").hasAnyRole("INCHARGE", "ADMIN", "APP_MANAGER")

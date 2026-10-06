@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import '../config/app_config.dart';
 import '../models/app_models.dart';
 import '../mock/mock_data.dart';
 import '../theme/app_theme.dart';
@@ -301,7 +302,7 @@ class SmartBusProvider extends ChangeNotifier {
     // Fire background HTTP requests to Spring Boot backend
     try {
       await http.post(
-        Uri.parse('http://localhost:8080/api/operations/breakdown'),
+        Uri.parse(AppConfig.endpoint('/api/operations/breakdown')),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'busNumber': busNumber,
@@ -314,7 +315,7 @@ class SmartBusProvider extends ChangeNotifier {
         }),
       );
       await http.post(
-        Uri.parse('http://localhost:8080/api/incharge/emergency-reports'),
+        Uri.parse(AppConfig.endpoint('/api/incharge/emergency-reports')),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'busNumber': busNumber,
@@ -806,7 +807,7 @@ class SmartBusProvider extends ChangeNotifier {
     }
     // Async backend call
     http.post(
-      Uri.parse('http://localhost:8080/api/admin/emergency-reports/$reportId/send-to-hod'),
+      Uri.parse(AppConfig.endpoint('/api/admin/emergency-reports/$reportId/send-to-hod')),
       headers: {'Content-Type': 'application/json'},
     ).catchError((_) => http.Response('', 500));
   }
@@ -818,7 +819,7 @@ class SmartBusProvider extends ChangeNotifier {
       notifyListeners();
     }
     http.post(
-      Uri.parse('http://localhost:8080/api/hod/emergency-reports/$reportId/approve-attendance'),
+      Uri.parse(AppConfig.endpoint('/api/hod/emergency-reports/$reportId/approve-attendance')),
       headers: {'Content-Type': 'application/json'},
     ).catchError((_) => http.Response('', 500));
   }
@@ -830,7 +831,7 @@ class SmartBusProvider extends ChangeNotifier {
       notifyListeners();
     }
     http.post(
-      Uri.parse('http://localhost:8080/api/hod/emergency-reports/$reportId/give-permission'),
+      Uri.parse(AppConfig.endpoint('/api/hod/emergency-reports/$reportId/give-permission')),
       headers: {'Content-Type': 'application/json'},
     ).catchError((_) => http.Response('', 500));
   }

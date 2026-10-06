@@ -1,8 +1,9 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../config/app_config.dart';
 
 class AuthApiService {
-  static const String baseUrl = 'http://localhost:8080/api/auth';
+  static String get baseUrl => AppConfig.endpoint('/api/auth');
   static String? _jwtToken;
   static String? _currentUserRole;
   static String? _currentUsername;

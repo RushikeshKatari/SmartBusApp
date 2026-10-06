@@ -1,8 +1,9 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../config/app_config.dart';
 
 class HodApiService {
-  static const _baseUrl = 'http://localhost:8080/api/hod';
+  static String get _baseUrl => AppConfig.endpoint('/api/hod');
   static String? _token;
 
   static Future<bool> login(String username, String password) async {
