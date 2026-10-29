@@ -1,5 +1,5 @@
 /// Application-wide environment configuration.
-/// 
+///
 /// Values can be injected at build time using Flutter's `--dart-define` flag:
 /// ```bash
 /// flutter build web --release \
@@ -16,16 +16,11 @@ class AppConfig {
     defaultValue: 'http://localhost:8080',
   );
 
-  /// Supabase project URL (optional client-side direct access if configured)
-  static const String supabaseUrl = String.fromEnvironment(
-    'SUPABASE_URL',
-    defaultValue: '',
-  );
-
-  /// Supabase public anonymous key (safe to include in web client)
-  static const String supabaseAnonKey = String.fromEnvironment(
-    'SUPABASE_ANON_KEY',
-    defaultValue: '',
+  /// Demo credentials and local-only state are opt-in. Production builds must
+  /// authenticate with the configured API instead of silently falling back.
+  static const bool demoMode = bool.fromEnvironment(
+    'DEMO_MODE',
+    defaultValue: false,
   );
 
   /// Helper to build full backend endpoints safely without trailing slash issues.

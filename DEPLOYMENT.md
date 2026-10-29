@@ -13,7 +13,7 @@ Flutter Web (Vercel)  ──HTTPS/API──>  Spring Boot API (Render)  ──JD
 |---|---|---|---|
 | **Frontend** | Flutter Web 3.x | **Vercel** | Responsive web client for Students, In-charges, Admins, HOD, and Managers |
 | **Backend** | Spring Boot 3.4 (Java 21) | **Render** | REST API, JWT auth, emergency handling, fleet routing, and WebSocket tracking |
-| **Database** | PostgreSQL 15+ | **Supabase** | Managed PostgreSQL database with Flyway schema migrations (`V1` to `V11`) |
+| **Database** | PostgreSQL 15+ | **Supabase** | Managed PostgreSQL database with Flyway schema migrations (`V1` to `V13`) |
 
 ---
 
@@ -26,7 +26,7 @@ Flutter Web (Vercel)  ──HTTPS/API──>  Spring Boot API (Render)  ──JD
    - Port: `5432` (or `6543` for connection pooling)
    - User: `postgres`
    - Password: `<your-db-password>`
-4. The Spring Boot backend uses Flyway to automatically apply all 11 database migrations upon starting:
+4. The Spring Boot backend uses Flyway to automatically apply all 13 database migrations upon starting:
    - `V1`: Core users, roles, sessions, student profiles
    - `V2`: App manager config & billing
    - `V3`: Fleet schema (buses, stops, routes)
@@ -35,6 +35,8 @@ Flutter Web (Vercel)  ──HTTPS/API──>  Spring Boot API (Render)  ──JD
    - `V6`-`V9`: Emergency reports, academic sections, HOD approvals
    - `V10`: Seed routes and demo accounts
    - `V11`: Breakdown reassignment tables
+   - `V12`: Twenty KLH Hyderabad demo corridors, stop coordinates, bus capacities and occupancy
+   - `V13`: Replace the obsolete Google Maps config with the OSRM endpoint setting
 
 ---
 
@@ -63,6 +65,7 @@ Flutter Web (Vercel)  ──HTTPS/API──>  Spring Boot API (Render)  ──JD
    | `BOOTSTRAP_MANAGER_PASSWORD` | `<strong-password>` | Initial manager password |
    | `BOOTSTRAP_HOD_USERNAME` | `hod` | Initial HOD user |
    | `BOOTSTRAP_HOD_PASSWORD` | `<strong-password>` | Initial HOD password |
+   | `OSRM_BASE_URL` | `https://router.project-osrm.org` | OSRM-compatible routing endpoint for road distance and ETA; public demo is best-effort |
 
 7. Click **Create Web Service**. Once deployed, Render will provide your public URL:
    `https://<your-service-name>.onrender.com`
@@ -117,6 +120,14 @@ Flutter Web (Vercel)  ──HTTPS/API──>  Spring Boot API (Render)  ──JD
 - [ ] **CORS**: Verify browser console displays no CORS errors during login or data fetching.
 - [ ] **Page Refresh**: Refreshing the browser while logged into any portal keeps the route active without 404.
 - [ ] **Logout**: Clicking Logout returns smoothly to the unified login screen.
+
+## KLH Hyderabad Demo Data and Account Provisioning
+
+`V12` seeds 20 representative corridors ending at KLH Aziz Nagar Campus, plus bus capacity/current occupancy for emergency reroute simulation. These are locality-level demo coordinates, not surveyed boarding points or road-verified route traces. The Java backend chooses rescue assignments using bus status, remaining capacity, stop proximity and stranded passenger counts. It requests road distance and duration from `OSRM_BASE_URL`; if the router is unavailable, the response labels the estimate as straight-line. The public OSRM demo endpoint is best-effort; use a hosted or self-managed endpoint for sustained use.
+
+The Admin Students and In-charges screens create server-backed login accounts and display a generated temporary password once. Admin Settings creates a login for Faculty/HOD entries. The recipient signs in with the issued username/password and can change it from their profile. Admins can issue a new temporary password from each listed account's reset action. Student login username is the roll number; in-charge login username is their email; faculty/HOD login username is their email.
+
+The client uses OpenStreetMap tiles through `flutter_map`; no Google Maps key is required. Keep visible “© OpenStreetMap contributors” attribution on maps. The public OSM tile service requires correct caching and prohibits bulk/offline tile fetching; it is best-effort and may block excessive use. For production-scale traffic, choose a tile provider with an appropriate service plan or host tiles. See the [OSM tile policy](https://operations.osmfoundation.org/policies/tiles/). The Java backend uses an OSRM-compatible router configured by `OSRM_BASE_URL`.
 
 ---
 

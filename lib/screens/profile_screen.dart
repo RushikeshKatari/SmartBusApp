@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/smart_bus_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common_widgets.dart';
+import '../widgets/password_change_dialog.dart';
 import 'active_sharing_screen.dart';
 import 'location_scanner_screen.dart';
 import 'role_selection_screen.dart';
@@ -29,6 +30,11 @@ class ProfileScreen extends StatelessWidget {
         title: const Text('Student Profile',
             style: TextStyle(fontWeight: FontWeight.w800)),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.lock_reset_rounded),
+            tooltip: 'Change password',
+            onPressed: () => showPasswordChangeDialog(context),
+          ),
           IconButton(
             icon: const Icon(Icons.logout_rounded, color: AppColors.danger),
             tooltip: 'Logout / Switch Portal',

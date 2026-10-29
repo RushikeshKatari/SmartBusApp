@@ -253,11 +253,22 @@ class _AdminStudentsState extends State<AdminStudents> {
                                   const TextStyle(fontWeight: FontWeight.bold)),
                           subtitle:
                               Text('${st.rollNumber} · ${st.assignedBus}'),
-                          trailing: IconButton(
-                              icon: const Icon(Icons.delete,
-                                  color: AppColors.danger),
-                              onPressed: () =>
-                                  _showDeleteConfirmation(context, st)),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.lock_reset_rounded),
+                                tooltip: 'Reset login password',
+                                onPressed: () => _resetPassword(context, st.rollNumber),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.delete,
+                                    color: AppColors.danger),
+                                onPressed: () =>
+                                    _showDeleteConfirmation(context, st),
+                              ),
+                            ],
+                          ),
                         );
                       },
                     );
@@ -332,7 +343,7 @@ class _AdminStudentsState extends State<AdminStudents> {
           TextButton(
               onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           FilledButton(
-            onPressed: () {
+            onPressed: () async {
               if (nameCtrl.text.isNotEmpty && rollCtrl.text.isNotEmpty) {
                 final newStudent = AdminStudent(
                   id: 'STU-${DateTime.now().millisecondsSinceEpoch}',
@@ -350,14 +361,57 @@ class _AdminStudentsState extends State<AdminStudents> {
                       : 'S',
                   avatarColor: AppColors.primary,
                 );
-                Provider.of<SmartBusProvider>(context, listen: false)
-                    .addStudent(newStudent);
+                final credentials = await Provider.of<SmartBusProvider>(
+                  context,
+                  listen: false,
+                ).createStudentWithLogin(newStudent);
+                if (!ctx.mounted) return;
+                if (credentials == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Could not create student account. Check the API connection and roll number.'),
+                    ),
+                  );
+                  return;
+                }
                 Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                    content: Text('Student added successfully!')));
+                _showCredentials(context, credentials);
               }
             },
             child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _resetPassword(BuildContext context, String username) async {
+    final credentials = await Provider.of<SmartBusProvider>(
+      context,
+      listen: false,
+    ).resetAccountPassword(username);
+    if (!context.mounted) return;
+    if (credentials == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not reset this account password.')),
+      );
+      return;
+    }
+    _showCredentials(context, credentials);
+  }
+
+  void _showCredentials(BuildContext context, Map<String, String> credentials) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Login credentials created'),
+        content: SelectableText(
+          'Username: ${credentials['username']}\nTemporary password: ${credentials['temporaryPassword']}\n\nShare these credentials securely. The user can change the password after login.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Done'),
           ),
         ],
       ),

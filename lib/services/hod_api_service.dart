@@ -6,6 +6,10 @@ class HodApiService {
   static String get _baseUrl => AppConfig.endpoint('/api/hod');
   static String? _token;
 
+  static void attachToken(String? token) => _token = token;
+
+  static void logout() => _token = null;
+
   static Future<bool> login(String username, String password) async {
     try {
       final response = await http.post(Uri.parse('$_baseUrl/login'),

@@ -5,7 +5,10 @@ import 'providers/smart_bus_provider.dart';
 import 'screens/login_screen.dart';
 import 'theme/app_theme.dart';
 
-void main() => runApp(const SmartBusApp());
+void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(const SmartBusApp());
+}
 
 class SmartBusApp extends StatelessWidget {
   const SmartBusApp({super.key});

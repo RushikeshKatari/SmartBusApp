@@ -40,22 +40,28 @@ class _InchargeQrScannerState extends State<InchargeQrScanner> {
                 final reason = reasons[i];
                 return ListTile(
                   title: Text(reason),
-                  onTap: () {
+                  onTap: () async {
                     provider.setBreakdownReason(reason);
-                    provider.triggerAutomatedBreakdownReroute(
-                      busNumber: 'SB-04',
-                      busName: 'Campus Express',
-                      inchargeName: 'Meera Singh',
-                      reason: reason,
-                      location: 'Tech Park Gate (2 km)',
-                      strandedStudentsCount: 15,
-                    );
+                    final applied = await provider
+                        .triggerAutomatedBreakdownReroute(
+                          busNumber: 'SB-04',
+                          busName: 'Campus Express',
+                          inchargeName: 'Meera Singh',
+                          reason: reason,
+                          location: 'Aziz Nagar / TSPA Junction',
+                          strandedStudentsCount: 15,
+                        );
                     Navigator.of(ctx).pop();
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text(
-                            'Emergency ($reason) reported. Auto-assigned SB-12 for pickup!'),
-                        backgroundColor: AppColors.danger,
+                          applied
+                              ? 'Emergency reported. Java dispatch plan created.'
+                              : 'Emergency dispatch failed. Check backend connection and login.',
+                        ),
+                        backgroundColor: applied
+                            ? AppColors.danger
+                            : AppColors.warning,
                         behavior: SnackBarBehavior.floating,
                       ),
                     );
@@ -88,23 +94,31 @@ class _InchargeQrScannerState extends State<InchargeQrScanner> {
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
-                controller: nameCtrl,
-                decoration: const InputDecoration(labelText: 'Name')),
+              controller: nameCtrl,
+              decoration: const InputDecoration(labelText: 'Name'),
+            ),
             TextField(
-                controller: rollCtrl,
-                decoration: const InputDecoration(labelText: 'Roll No')),
+              controller: rollCtrl,
+              decoration: const InputDecoration(labelText: 'Roll No'),
+            ),
             TextField(
-                controller: deptCtrl,
-                decoration: const InputDecoration(labelText: 'Department')),
+              controller: deptCtrl,
+              decoration: const InputDecoration(labelText: 'Department'),
+            ),
           ],
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
             onPressed: () {
               provider.addAttendanceRecord(
-                  rollCtrl.text, nameCtrl.text, 'Campus Express 04');
+                rollCtrl.text,
+                nameCtrl.text,
+                'Campus Express 04',
+              );
               Navigator.pop(ctx);
             },
             child: const Text('Submit'),
@@ -118,9 +132,7 @@ class _InchargeQrScannerState extends State<InchargeQrScanner> {
   Widget build(BuildContext context) {
     final provider = Provider.of<SmartBusProvider>(context);
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('QR Scan'),
-      ),
+      appBar: AppBar(title: const Text('QR Scan')),
       body: Container(
         decoration: BoxDecoration(
           border: Border.all(
@@ -140,11 +152,17 @@ class _InchargeQrScannerState extends State<InchargeQrScanner> {
                 const Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('QR Scan',
-                        style: TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.bold)),
-                    Text('Scan student QR codes to log attendance',
-                        style: TextStyle(color: AppColors.muted, fontSize: 12)),
+                    Text(
+                      'QR Scan',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      'Scan student QR codes to log attendance',
+                      style: TextStyle(color: AppColors.muted, fontSize: 12),
+                    ),
                   ],
                 ),
                 IconButton(
@@ -175,7 +193,8 @@ class _InchargeQrScannerState extends State<InchargeQrScanner> {
                       color: const Color(0xFF0F172A),
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                          color: AppColors.primary.withValues(alpha: 0.4)),
+                        color: AppColors.primary.withValues(alpha: 0.4),
+                      ),
                     ),
                     child: Stack(
                       alignment: Alignment.center,
@@ -183,32 +202,43 @@ class _InchargeQrScannerState extends State<InchargeQrScanner> {
                         const Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.qr_code_scanner_rounded,
-                                color: AppColors.primary, size: 80),
+                            Icon(
+                              Icons.qr_code_scanner_rounded,
+                              color: AppColors.primary,
+                              size: 80,
+                            ),
                             SizedBox(height: 12),
-                            Text('Point camera at Student QR Pass',
-                                style: TextStyle(
-                                    color: Colors.white70, fontSize: 13)),
+                            Text(
+                              'Point camera at Student QR Pass',
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 13,
+                              ),
+                            ),
                           ],
                         ),
                         Positioned(
                           bottom: 12,
                           child: Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 4),
+                              horizontal: 12,
+                              vertical: 4,
+                            ),
                             decoration: BoxDecoration(
-                                color: Colors.black54,
-                                borderRadius: BorderRadius.circular(20)),
+                              color: Colors.black54,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
                             child: Text(
                               provider.sharingActive
                                   ? 'GPS Broadcast ACTIVE • Live'
                                   : 'GPS Broadcast Standby',
                               style: TextStyle(
-                                  color: provider.sharingActive
-                                      ? AppColors.success
-                                      : Colors.white60,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold),
+                                color: provider.sharingActive
+                                    ? AppColors.success
+                                    : Colors.white60,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                         ),
@@ -220,14 +250,20 @@ class _InchargeQrScannerState extends State<InchargeQrScanner> {
                     width: double.infinity,
                     child: OutlinedButton.icon(
                       icon: const Icon(Icons.qr_code_2_rounded),
-                      label: const Text('Simulate Scan: Aarav Sharma (CS2024-117)'),
+                      label: const Text(
+                        'Simulate Scan: Aarav Sharma (CS2024-117)',
+                      ),
                       onPressed: () {
                         provider.addAttendanceRecord(
-                            'CS2024-117', 'Aarav Sharma', 'Campus Express 04');
+                          'CS2024-117',
+                          'Aarav Sharma',
+                          'Campus Express 04',
+                        );
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                             content: Text(
-                                '✓ QR Attendance Logged: Aarav Sharma (CS2024-117) marked BOARDED'),
+                              '✓ QR Attendance Logged: Aarav Sharma (CS2024-117) marked BOARDED',
+                            ),
                             behavior: SnackBarBehavior.floating,
                             backgroundColor: AppColors.success,
                           ),

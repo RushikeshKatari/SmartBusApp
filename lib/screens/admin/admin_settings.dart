@@ -84,15 +84,50 @@ class _AdminSettingsState extends State<AdminSettings> {
                             style:
                                 const TextStyle(fontWeight: FontWeight.bold)),
                         subtitle: Text('${staff['role']} · ${staff['email']}'),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.delete_outline,
-                              color: AppColors.danger),
-                          onPressed: () {
-                            provider.removeStaff(staff['id']!);
-                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                                content: Text(
-                                    '${staff['name']} removed from staff')));
-                          },
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (staff['role'] == 'Faculty')
+                              IconButton(
+                                icon: const Icon(Icons.lock_reset_rounded),
+                                tooltip: 'Reset faculty login password',
+                                onPressed: () async {
+                                  final credentials = await provider
+                                      .resetAccountPassword(staff['email']!);
+                                  if (!context.mounted) return;
+                                  if (credentials == null) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('Could not reset faculty password.')),
+                                    );
+                                    return;
+                                  }
+                                  showDialog<void>(
+                                    context: context,
+                                    builder: (ctx) => AlertDialog(
+                                      title: const Text('Temporary password'),
+                                      content: SelectableText(
+                                        'Username: ${credentials['username']}\nTemporary password: ${credentials['temporaryPassword']}',
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () => Navigator.pop(ctx),
+                                          child: const Text('Done'),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline,
+                                  color: AppColors.danger),
+                              onPressed: () {
+                                provider.removeStaff(staff['id']!);
+                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                    content: Text('${staff['name']} removed from staff')));
+                              },
+                            ),
+                          ],
                         ),
                       )),
                 ],
@@ -152,19 +187,65 @@ class _AdminSettingsState extends State<AdminSettings> {
           TextButton(
               onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           FilledButton(
-            onPressed: () {
+            onPressed: () async {
               if (nameCtrl.text.isNotEmpty) {
-                Provider.of<SmartBusProvider>(context, listen: false).addStaff({
-                  'id': 'STF-${DateTime.now().millisecondsSinceEpoch}',
-                  'name': nameCtrl.text,
-                  'role': roleCtrl.text.isNotEmpty ? roleCtrl.text : 'Staff',
-                  'email': emailCtrl.text.isNotEmpty
-                      ? emailCtrl.text
-                      : 'staff@college.edu',
-                });
+                final provider = Provider.of<SmartBusProvider>(
+                  context,
+                  listen: false,
+                );
+                final role = roleCtrl.text.trim();
+                final email = emailCtrl.text.trim();
+                Map<String, String>? credentials;
+                if (role.toLowerCase().contains('faculty') ||
+                    role.toLowerCase() == 'hod') {
+                  if (email.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Faculty email is required as the login username.')),
+                    );
+                    return;
+                  }
+                  credentials = await provider.createFacultyWithLogin(
+                    name: nameCtrl.text.trim(),
+                    email: email,
+                  );
+                  if (!ctx.mounted) return;
+                  if (credentials == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Could not create faculty login. Check the API connection and email.')),
+                    );
+                    return;
+                  }
+                } else {
+                  provider.addStaff({
+                    'id': 'STF-${DateTime.now().millisecondsSinceEpoch}',
+                    'name': nameCtrl.text,
+                    'role': role.isNotEmpty ? role : 'Staff',
+                    'email': email.isNotEmpty ? email : 'staff@college.edu',
+                  });
+                }
                 Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Staff member added!')));
+                final issuedCredentials = credentials;
+                if (issuedCredentials != null) {
+                  showDialog<void>(
+                    context: context,
+                    builder: (dialogContext) => AlertDialog(
+                      title: const Text('Faculty login created'),
+                      content: SelectableText(
+                        'Username: ${issuedCredentials['username']}\nTemporary password: ${issuedCredentials['temporaryPassword']}\n\nThis is a faculty/HOD login. Share the password securely; they can change it after login.',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(dialogContext),
+                          child: const Text('Done'),
+                        ),
+                      ],
+                    ),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Staff member added.')),
+                  );
+                }
               }
             },
             child: const Text('Save'),

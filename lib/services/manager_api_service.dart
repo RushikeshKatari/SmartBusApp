@@ -6,6 +6,10 @@ class ManagerApiService {
   static String get baseUrl => AppConfig.endpoint('/api/manager');
   static String? _jwtToken;
 
+  static void attachToken(String? token) => _jwtToken = token;
+
+  static void logout() => _jwtToken = null;
+
   static Future<bool> login(String username, String password) async {
     try {
       final res = await http.post(

@@ -15,6 +15,7 @@ server:
 smartbus:
   jwt-secret: ${JWT_SECRET}
   jwt-ttl-hours: 168
+  osrm-base-url: ${OSRM_BASE_URL:https://router.project-osrm.org}
   cors-origins: ${CORS_ORIGINS:http://localhost:*,http://127.0.0.1:*}
   bootstrap-manager-username: ${BOOTSTRAP_MANAGER_USERNAME:superadmin}
   bootstrap-manager-password: ${BOOTSTRAP_MANAGER_PASSWORD:admin123}

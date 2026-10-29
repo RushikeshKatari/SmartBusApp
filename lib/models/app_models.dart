@@ -1,57 +1,64 @@
 import 'package:flutter/material.dart';
 
 class Student {
-  const Student(
-      {required this.name,
-      required this.rollNumber,
-      required this.department,
-      required this.busName,
-      required this.initials});
+  const Student({
+    required this.name,
+    required this.rollNumber,
+    required this.department,
+    required this.busName,
+    required this.initials,
+    this.busNumber = 'SB-04',
+  });
   final String name, rollNumber, department, busName, initials;
+  final String busNumber;
 }
 
 class Bus {
-  const Bus(
-      {required this.name,
-      required this.number,
-      required this.driver,
-      required this.eta,
-      required this.nextStop,
-      required this.occupancy,
-      required this.distance,
-      required this.status});
+  const Bus({
+    required this.name,
+    required this.number,
+    required this.driver,
+    required this.eta,
+    required this.nextStop,
+    required this.occupancy,
+    required this.distance,
+    required this.status,
+  });
   final String name, number, driver, eta, nextStop, occupancy, distance, status;
 }
 
 class BusStop {
-  const BusStop(
-      {required this.name,
-      required this.time,
-      required this.distance,
-      this.isNext = false});
+  const BusStop({
+    required this.name,
+    required this.time,
+    required this.distance,
+    this.isNext = false,
+  });
   final String name, time, distance;
   final bool isNext;
 }
 
 class AppNotification {
-  const AppNotification(
-      {required this.title,
-      required this.message,
-      required this.time,
-      required this.category,
-      required this.icon,
-      this.unread = false});
+  const AppNotification({
+    required this.title,
+    required this.message,
+    required this.time,
+    required this.category,
+    required this.icon,
+    this.unread = false,
+  });
   final String title, message, time, category;
   final IconData icon;
   final bool unread;
 }
 
 class Advertisement {
-  const Advertisement(
-      {required this.tag,
-      required this.title,
-      required this.subtitle,
-      required this.color});
+  const Advertisement({
+    required this.tag,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+  });
   final String tag, title, subtitle;
   final Color color;
 }
@@ -211,8 +218,11 @@ class AdminNotificationItem {
 }
 
 class AttendancePoint {
-  const AttendancePoint(
-      {required this.label, required this.value, required this.total});
+  const AttendancePoint({
+    required this.label,
+    required this.value,
+    required this.total,
+  });
   final String label;
   final int value, total;
 }
@@ -247,9 +257,14 @@ class EmergencyAttendanceReport {
   final List<Map<String, String>> students;
   final bool sentToHod, attendanceGiven, permissionGiven;
 
-  EmergencyAttendanceReport copyWith({bool? sentToHod, bool? attendanceGiven, bool? permissionGiven}) =>
+  EmergencyAttendanceReport copyWith({
+    String? id,
+    bool? sentToHod,
+    bool? attendanceGiven,
+    bool? permissionGiven,
+  }) =>
       EmergencyAttendanceReport(
-        id: id,
+        id: id ?? this.id,
         busNumber: busNumber,
         busName: busName,
         inchargeName: inchargeName,
@@ -264,10 +279,11 @@ class EmergencyAttendanceReport {
 }
 
 class AcademicStudent {
-  const AcademicStudent(
-      {required this.name,
-      required this.rollNumber,
-      this.attendancePercent = 0});
+  const AcademicStudent({
+    required this.name,
+    required this.rollNumber,
+    this.attendancePercent = 0,
+  });
   final String name, rollNumber;
   final double attendancePercent;
 }
@@ -285,7 +301,9 @@ class AcademicSection {
   double get attendancePercent => students.isEmpty
       ? 0
       : students.fold<double>(
-              0, (total, student) => total + student.attendancePercent) /
+            0,
+            (total, student) => total + student.attendancePercent,
+          ) /
           students.length;
 }
 
@@ -374,13 +392,21 @@ class LiveBusRoute {
     this.breakdownLocation,
     this.assignedReplacementBusNumber,
   });
-  final String id, routeNumber, name, busNumber, busName, driverName, driverPhone;
+  final String id,
+      routeNumber,
+      name,
+      busNumber,
+      busName,
+      driverName,
+      driverPhone;
   final Color color;
   final List<LiveRouteStop> stops;
   final double totalDistanceKm;
   final int totalDurationMinutes;
   final bool isBrokenDown;
-  final String? breakdownReason, breakdownLocation, assignedReplacementBusNumber;
+  final String? breakdownReason,
+      breakdownLocation,
+      assignedReplacementBusNumber;
 
   LiveBusRoute copyWith({
     bool? isBrokenDown,
@@ -425,6 +451,8 @@ class DivertedStopAssignment {
     required this.isUturnRequired,
     required this.detourDistanceKm,
     required this.estimatedArrival,
+    this.studentCount = 0,
+    this.spareSeatsBefore = 0,
     this.isInvalidated = false,
     this.redirectToStopName,
     this.redirectMessage,
@@ -438,6 +466,7 @@ class DivertedStopAssignment {
       driverPhone,
       estimatedArrival;
   final double latitude, longitude, detourDistanceKm;
+  final int studentCount, spareSeatsBefore;
   final bool isUturnRequired;
   final bool isInvalidated;
   final String? redirectToStopName;
@@ -451,6 +480,8 @@ class DivertedStopAssignment {
     bool? isUturnRequired,
     double? detourDistanceKm,
     String? estimatedArrival,
+    int? studentCount,
+    int? spareSeatsBefore,
     bool? isInvalidated,
     String? redirectToStopName,
     String? redirectMessage,
@@ -468,6 +499,8 @@ class DivertedStopAssignment {
         isUturnRequired: isUturnRequired ?? this.isUturnRequired,
         detourDistanceKm: detourDistanceKm ?? this.detourDistanceKm,
         estimatedArrival: estimatedArrival ?? this.estimatedArrival,
+        studentCount: studentCount ?? this.studentCount,
+        spareSeatsBefore: spareSeatsBefore ?? this.spareSeatsBefore,
         isInvalidated: isInvalidated ?? this.isInvalidated,
         redirectToStopName: redirectToStopName ?? this.redirectToStopName,
         redirectMessage: redirectMessage ?? this.redirectMessage,
@@ -493,6 +526,7 @@ class BreakdownRerouteEvent {
     required this.affectedStopNames,
     required this.createdAt,
     this.stopAssignments = const [],
+    this.unassignedStudentsByStop = const {},
     this.totalRemainingStops = 0,
     this.coveredRemainingStops = 0,
     this.allStopsCovered = true,
@@ -513,8 +547,20 @@ class BreakdownRerouteEvent {
   final double detourDistanceKm;
   final List<String> affectedStopNames;
   final List<DivertedStopAssignment> stopAssignments;
+  final Map<String, int> unassignedStudentsByStop;
   final int totalRemainingStops;
   final int coveredRemainingStops;
   final bool allStopsCovered;
-}
 
+  int get studentsCovered => stopAssignments.fold<int>(
+        0,
+        (total, assignment) => total + assignment.studentCount,
+      );
+  int get studentsUnassigned => studentsCovered >= strandedStudentsCount
+      ? 0
+      : strandedStudentsCount - studentsCovered;
+  List<String> get rescueBusNumbers => stopAssignments
+      .map((assignment) => assignment.assignedBusNumber)
+      .toSet()
+      .toList(growable: false);
+}

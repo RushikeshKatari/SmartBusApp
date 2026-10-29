@@ -16,7 +16,7 @@ class AdminDashboard extends StatelessWidget {
   }
   @override
   Widget build(BuildContext context) {
-    const buses = MockData.buses;
+    final buses = MockData.buses;
     const students = MockData.students;
     final routes = MockData.routeRecords;
     final pendingRoutes = routes.where((r) => r.status == 'Pending').toList();
@@ -152,7 +152,7 @@ class AdminDashboard extends StatelessWidget {
                         child: Column(children: [
                       _PendingApprovals(routes: pendingRoutes),
                       const SizedBox(height: 16),
-                      const _LiveBusStatus(buses: MockData.buses),
+                      _LiveBusStatus(buses: buses),
                     ])),
                   ])
                 : Column(children: [
@@ -160,7 +160,7 @@ class AdminDashboard extends StatelessWidget {
                     const SizedBox(height: 16),
                     _PendingApprovals(routes: pendingRoutes),
                     const SizedBox(height: 16),
-                    const _LiveBusStatus(buses: MockData.buses),
+                    _LiveBusStatus(buses: buses),
                   ]);
           }),
         ],

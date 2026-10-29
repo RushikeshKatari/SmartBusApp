@@ -13,6 +13,12 @@ public class Bus {
     public String registrationNumber;
     
     public int capacity;
+
+    @Column(name = "current_occupancy", nullable = false)
+    public int currentOccupancy;
+
+    @Column(nullable = false)
+    public String status = "ACTIVE";
     
     @ManyToOne
     @JoinColumn(name="route_id")

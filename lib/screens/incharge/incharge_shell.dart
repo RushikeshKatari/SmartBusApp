@@ -4,6 +4,7 @@ import '../login_screen.dart';
 import 'incharge_dashboard.dart';
 import 'incharge_my_bus.dart';
 import 'incharge_qr_scanner.dart';
+import '../../widgets/password_change_dialog.dart';
 
 class InchargeShell extends StatefulWidget {
   const InchargeShell({super.key});
@@ -63,6 +64,11 @@ class _InchargeShellState extends State<InchargeShell> {
         ),
         centerTitle: false,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.lock_reset_rounded),
+            tooltip: 'Change password',
+            onPressed: () => showPasswordChangeDialog(context),
+          ),
           IconButton(
             icon: const Icon(Icons.logout_rounded, color: AppColors.danger),
             tooltip: 'Logout',

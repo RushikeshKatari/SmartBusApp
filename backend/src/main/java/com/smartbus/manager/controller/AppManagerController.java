@@ -51,7 +51,7 @@ public class AppManagerController {
     @GetMapping("/billing/services")
     public ResponseEntity<?> getServiceBilling() {
         return ResponseEntity.ok(java.util.List.of(
-            Map.of("service", "Google Maps API", "cost", 45.20, "calls", 12500, "status", "active"),
+            Map.of("service", "OpenStreetMap / OSRM", "cost", 0.00, "calls", 0, "status", "configured"),
             Map.of("service", "PostgreSQL Database", "cost", 20.00, "calls", 450000, "status", "active"),
             Map.of("service", "Firebase Notifications", "cost", 5.50, "calls", 3200, "status", "active"),
             Map.of("service", "Stripe Fees", "cost", 12.00, "calls", 150, "status", "active"),

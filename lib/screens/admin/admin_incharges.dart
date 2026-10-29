@@ -101,6 +101,11 @@ class _AdminInchargesState extends State<AdminIncharges> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         IconButton(
+                          icon: const Icon(Icons.lock_reset_rounded),
+                          tooltip: 'Reset login password',
+                          onPressed: () => _resetPassword(context, ic.email),
+                        ),
+                        IconButton(
                           icon: const Icon(Icons.link_rounded,
                               color: Color(0xFF7C3AED)),
                           onPressed: () => _showAssignBusDialog(context, ic),
@@ -162,7 +167,7 @@ class _AdminInchargesState extends State<AdminIncharges> {
           TextButton(
               onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           FilledButton(
-            onPressed: () {
+            onPressed: () async {
               if (nameCtrl.text.isNotEmpty) {
                 final newIc = BusIncharge(
                   id: 'INC-${DateTime.now().millisecondsSinceEpoch}',
@@ -180,14 +185,57 @@ class _AdminInchargesState extends State<AdminIncharges> {
                   avatarColor: const Color(0xFF7C3AED),
                   joinedDate: 'Just Now',
                 );
-                Provider.of<SmartBusProvider>(context, listen: false)
-                    .addIncharge(newIc);
+                final credentials = await Provider.of<SmartBusProvider>(
+                  context,
+                  listen: false,
+                ).createInchargeWithLogin(newIc);
+                if (!ctx.mounted) return;
+                if (credentials == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Could not create in-charge account. Check the API connection and email.'),
+                    ),
+                  );
+                  return;
+                }
                 Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Bus In-charge added!')));
+                _showCredentials(context, credentials);
               }
             },
             child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _resetPassword(BuildContext context, String username) async {
+    final credentials = await Provider.of<SmartBusProvider>(
+      context,
+      listen: false,
+    ).resetAccountPassword(username);
+    if (!context.mounted) return;
+    if (credentials == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not reset this account password.')),
+      );
+      return;
+    }
+    _showCredentials(context, credentials);
+  }
+
+  void _showCredentials(BuildContext context, Map<String, String> credentials) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Login credentials created'),
+        content: SelectableText(
+          'Username: ${credentials['username']}\nTemporary password: ${credentials['temporaryPassword']}\n\nShare these credentials securely. The user can change the password after login.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Done'),
           ),
         ],
       ),

@@ -11,11 +11,11 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U smartbus_user -d smartbus_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
   backend:
     build: .
@@ -26,10 +26,10 @@ services:
       - DATABASE_USERNAME=smartbus_user
       - DATABASE_PASSWORD=smartbus_password
       - JWT_SECRET=this_is_a_very_secure_and_long_jwt_secret_for_smartbus_256_bits!
-      - REDIS_URL=redis://redis:6379
+      - OSRM_BASE_URL=${OSRM_BASE_URL:-https://router.project-osrm.org}
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
 
 volumes:
   postgres_data:

@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../config/app_config.dart';
+import 'hod_api_service.dart';
+import 'manager_api_service.dart';
 
 class AuthApiService {
   static String get baseUrl => AppConfig.endpoint('/api/auth');
@@ -14,25 +16,33 @@ class AuthApiService {
   static String? get currentUsername => _currentUsername;
   static String? get currentDisplayName => _currentDisplayName;
 
+  static Map<String, String> get authenticatedHeaders => {
+    'Content-Type': 'application/json',
+    if (_jwtToken != null) 'Authorization': 'Bearer $_jwtToken',
+  };
+
   /// Authenticate against backend /api/auth/login with fallback to offline demo credentials
   static Future<Map<String, dynamic>> login({
     required String username,
     required String password,
     String? expectedRole,
   }) async {
+    logout();
     final cleanUser = username.trim();
     final cleanPass = password;
 
     try {
-      final res = await http.post(
-        Uri.parse('$baseUrl/login'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'username': cleanUser,
-          'password': cleanPass,
-          'role': expectedRole,
-        }),
-      ).timeout(const Duration(seconds: 3));
+      final res = await http
+          .post(
+            Uri.parse('$baseUrl/login'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'username': cleanUser,
+              'password': cleanPass,
+              'role': expectedRole,
+            }),
+          )
+          .timeout(const Duration(seconds: 3));
 
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body) as Map<String, dynamic>;
@@ -40,20 +50,33 @@ class AuthApiService {
         _currentUserRole = data['role'] as String? ?? expectedRole;
         _currentUsername = data['username'] as String? ?? cleanUser;
         _currentDisplayName = data['displayName'] as String?;
+        if (_currentUserRole == 'HOD') HodApiService.attachToken(_jwtToken);
+        if (_currentUserRole == 'APP_MANAGER') {
+          ManagerApiService.attachToken(_jwtToken);
+        }
+        final profile = await currentUser();
         return {
           'success': true,
           'role': _currentUserRole,
           'username': _currentUsername,
           'displayName': _currentDisplayName,
+          if (profile != null) ...profile,
           'isBackend': true,
         };
       }
+      return {
+        'success': false,
+        'error':
+            'Login rejected by the server (${res.statusCode}). Check your credentials and role.',
+      };
     } catch (_) {
-      // Backend not running or offline; proceed to fallback demo validation below
+      // Network failure may use local credentials only when demo mode is enabled.
     }
 
     // Offline / Demo credentials validation
-    final role = _verifyDemoCredentials(cleanUser, cleanPass, expectedRole);
+    final role = AppConfig.demoMode
+        ? _verifyDemoCredentials(cleanUser, cleanPass, expectedRole)
+        : null;
     if (role != null) {
       _currentUserRole = role;
       _currentUsername = cleanUser;
@@ -69,12 +92,17 @@ class AuthApiService {
 
     return {
       'success': false,
-      'error': 'Invalid credentials. Please enter a valid ID and password.',
+      'error': AppConfig.demoMode
+          ? 'Invalid credentials. Please enter a valid ID and password.'
+          : 'Unable to reach the SmartBus server. Check your connection and API URL.',
     };
   }
 
   static String? _verifyDemoCredentials(
-      String username, String password, String? expectedRole) {
+    String username,
+    String password,
+    String? expectedRole,
+  ) {
     final u = username.toLowerCase();
     final p = password;
 
@@ -134,5 +162,21 @@ class AuthApiService {
     _currentUserRole = null;
     _currentUsername = null;
     _currentDisplayName = null;
+    HodApiService.logout();
+    ManagerApiService.logout();
+  }
+
+  static Future<Map<String, dynamic>?> currentUser() async {
+    if (_jwtToken == null) return null;
+    try {
+      final response = await http.get(
+        Uri.parse(AppConfig.endpoint('/api/auth/me')),
+        headers: authenticatedHeaders,
+      );
+      if (response.statusCode != 200) return null;
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } catch (_) {
+      return null;
+    }
   }
 }

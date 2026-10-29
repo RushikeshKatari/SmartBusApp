@@ -60,6 +60,15 @@ public class OperationsController {
         String assignedPickupDriverPhone,
         double detourDistanceKm,
         int detourEtaMinutes,
+        int strandedStudentsCount,
+        int coveredStudentsCount,
+        int unassignedStudentsCount,
+        int affectedStopsCount,
+        int coveredStopsCount,
+        boolean allStopsCovered,
+        List<RouteOptimizerService.StopAssignment> assignments,
+        java.util.Map<String, Integer> unassignedStudentsByStop,
+        List<String> rescueBusNumbers,
         String status,
         String explanation,
         String createdAt
@@ -72,30 +81,39 @@ public class OperationsController {
     public ResponseEntity<BreakdownResponse> reportBreakdown(@RequestBody BreakdownRequest request) {
         // Automatic optimal bus evaluation & reroute calculation
         var reroute = routeOptimizer.calculateOptimalReroute(
-            request.busId() != null ? request.busId() : UUID.randomUUID(),
-            request.latitude() != 0 ? request.latitude() : 12.9660,
-            request.longitude() != 0 ? request.longitude() : 77.5880,
-            request.strandedStudentsCount() > 0 ? request.strandedStudentsCount() : 15
+            request.busId(),
+            request.busNumber(),
+            request.latitude(),
+            request.longitude(),
+            Math.max(0, request.strandedStudentsCount())
         );
-
-        Bus pickupBus = reroute.selectedBus();
-        String pickupBusNum = pickupBus != null ? pickupBus.registrationNumber : "SB-12 (City Connector)";
-        String pickupDriver = pickupBus != null ? pickupBus.driverName : "Imran Khan";
-        String pickupPhone = pickupBus != null ? pickupBus.driverPhone : "+91 87654 32109";
+        List<String> rescueBuses = reroute.assignments().stream()
+                .map(RouteOptimizerService.StopAssignment::assignedBusNumber)
+                .distinct().toList();
+        var firstAssignment = reroute.assignments().isEmpty() ? null : reroute.assignments().getFirst();
 
         BreakdownResponse response = new BreakdownResponse(
             UUID.randomUUID(),
-            request.busNumber() != null ? request.busNumber() : "SB-04",
-            request.inchargeName() != null ? request.inchargeName() : "Meera Singh",
-            request.reason() != null ? request.reason() : "Engine Breakdown",
-            request.location() != null ? request.location() : "Tech Park Gate",
-            pickupBusNum,
-            pickupDriver,
-            pickupPhone,
-            reroute.addedDistanceKm(),
-            reroute.addedDurationMinutes(),
+            request.busNumber(),
+            request.inchargeName(),
+            request.reason(),
+            request.location(),
+            firstAssignment == null ? "No capacity available" : firstAssignment.assignedBusNumber(),
+            firstAssignment == null ? "Unassigned" : firstAssignment.driverName(),
+            firstAssignment == null ? "" : firstAssignment.driverPhone(),
+            reroute.totalDetourDistanceKm(),
+            reroute.estimatedAdditionalMinutes(),
+            reroute.strandedStudents(),
+            reroute.strandedStudents() - reroute.unassignedStudents(),
+            reroute.unassignedStudents(),
+            reroute.affectedStopsCount(),
+            reroute.coveredStopsCount(),
+            reroute.allStopsCovered(),
+            reroute.assignments(),
+            reroute.unassignedStudentsByStop(),
+            rescueBuses,
             "ACTIVE_REROUTING",
-            reroute.reason(),
+            reroute.explanation(),
             Instant.now().toString()
         );
 

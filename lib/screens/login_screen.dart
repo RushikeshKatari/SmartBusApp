@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../services/auth_api_service.dart';
+import '../providers/smart_bus_provider.dart';
 import '../theme/app_theme.dart';
 import 'admin/admin_shell.dart';
 import 'hod/hod_portal.dart';
@@ -51,6 +53,9 @@ class _SingleLoginScreenState extends State<SingleLoginScreen> {
 
     if (result['success'] == true) {
       final roleStr = result['role'] as String?;
+      if (roleStr == 'STUDENT') {
+        context.read<SmartBusProvider>().applyAuthenticatedStudentProfile(result);
+      }
       Widget targetScreen;
 
       switch (roleStr) {

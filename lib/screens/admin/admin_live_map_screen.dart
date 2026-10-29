@@ -1,8 +1,13 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_map/flutter_map.dart' as osm;
+import 'package:latlong2/latlong.dart' as geo;
 import '../../models/app_models.dart';
+import '../../mock/hyderabad_route_data.dart';
 import '../../providers/smart_bus_provider.dart';
+import '../../services/route_path_api_service.dart';
 import '../../theme/app_theme.dart';
 
 class AdminLiveMapScreen extends StatefulWidget {
@@ -13,16 +18,75 @@ class AdminLiveMapScreen extends StatefulWidget {
 }
 
 class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
+  final osm.MapController _mapController = osm.MapController();
   LiveBusRoute? _selectedRoute;
   LiveRouteStop? _selectedStop;
   bool _isBreakdownTabSelected = false;
+  int _simulatedStrandedPassengers = 15;
+  Map<String, List<geo.LatLng>> _roadPaths = const {};
+  final DateTime _simulationStartedAt = DateTime.now();
+  Timer? _busTicker;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRoadPaths();
+    _busTicker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  Future<void> _loadRoadPaths() async {
+    final paths = await RoutePathApiService.fetchRoadPaths();
+    if (mounted && paths.isNotEmpty) setState(() => _roadPaths = paths);
+  }
+
+  @override
+  void dispose() {
+    _busTicker?.cancel();
+    super.dispose();
+  }
+
+  List<geo.LatLng> _pathFor(LiveBusRoute route) =>
+      _roadPaths[route.busNumber] ??
+      route.stops
+          .map((stop) => geo.LatLng(stop.latitude, stop.longitude))
+          .toList();
+
+  geo.LatLng _positionOnRoute(List<geo.LatLng> points, double phaseOffset) {
+    final elapsed =
+        DateTime.now().difference(_simulationStartedAt).inMilliseconds / 90000;
+    final progress = (elapsed + phaseOffset) % 1;
+    final position = progress * (points.length - 1);
+    final index = position.floor();
+    final fraction = position - index;
+    final start = points[index];
+    final end = points[(index + 1).clamp(0, points.length - 1)];
+    return geo.LatLng(
+      start.latitude + (end.latitude - start.latitude) * fraction,
+      start.longitude + (end.longitude - start.longitude) * fraction,
+    );
+  }
+
+  geo.LatLng _snapToRoute(geo.LatLng point, List<geo.LatLng> path) {
+    if (path.isEmpty) return point;
+    return path.reduce((nearest, candidate) {
+      final nearestDistance = math.pow(nearest.latitude - point.latitude, 2) +
+          math.pow(nearest.longitude - point.longitude, 2);
+      final candidateDistance =
+          math.pow(candidate.latitude - point.latitude, 2) +
+              math.pow(candidate.longitude - point.longitude, 2);
+      return candidateDistance < nearestDistance ? candidate : nearest;
+    });
+  }
 
   void _showInvalidateDialog(
-      BuildContext context,
-      SmartBusProvider provider,
-      String stopId,
-      String stopName,
-      List<LiveBusRoute> routes) {
+    BuildContext context,
+    SmartBusProvider provider,
+    String stopId,
+    String stopName,
+    List<LiveBusRoute> routes,
+  ) {
     // Pick other available stops as redirect candidates
     final candidateStops = <String>[];
     for (final r in routes) {
@@ -36,7 +100,8 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
         ? candidateStops.first
         : 'Central Campus Gate';
     final walkMsgController = TextEditingController(
-      text: 'Stop temporarily merged into $selectedTargetStop. Please walk to $selectedTargetStop for pickup.',
+      text:
+          'Stop temporarily merged into $selectedTargetStop. Please walk to $selectedTargetStop for pickup.',
     );
 
     showDialog(
@@ -58,8 +123,11 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
                       color: AppColors.danger.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Icon(Icons.do_not_disturb_on_rounded,
-                        color: AppColors.danger, size: 20),
+                    child: const Icon(
+                      Icons.do_not_disturb_on_rounded,
+                      color: AppColors.danger,
+                      size: 20,
+                    ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -69,14 +137,17 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
                         const Text(
                           'Invalidate Stop',
                           style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w800),
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
                         Text(
                           'No bus detour needed for "$stopName"',
                           style: const TextStyle(
-                              color: Colors.white54, fontSize: 11),
+                            color: Colors.white54,
+                            fontSize: 11,
+                          ),
                         ),
                       ],
                     ),
@@ -92,9 +163,10 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
                     const Text(
                       'Select nearest stop to redirect students to:',
                       style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600),
+                        color: Colors.white70,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Container(
@@ -110,16 +182,20 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
                           isExpanded: true,
                           dropdownColor: const Color(0xFF1E293B),
                           style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600),
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
                           items: candidateStops.map((name) {
                             return DropdownMenuItem<String>(
                               value: name,
                               child: Row(
                                 children: [
-                                  const Icon(Icons.pin_drop_rounded,
-                                      color: Color(0xFF38BDF8), size: 16),
+                                  const Icon(
+                                    Icons.pin_drop_rounded,
+                                    color: Color(0xFF38BDF8),
+                                    size: 16,
+                                  ),
                                   const SizedBox(width: 8),
                                   Text(name),
                                 ],
@@ -142,31 +218,35 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
                     const Text(
                       'Walking instructions & Student notification:',
                       style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600),
+                        color: Colors.white70,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     const SizedBox(height: 6),
                     TextField(
                       controller: walkMsgController,
                       maxLines: 2,
-                      style:
-                          const TextStyle(color: Colors.white, fontSize: 12),
+                      style: const TextStyle(color: Colors.white, fontSize: 12),
                       decoration: InputDecoration(
                         filled: true,
                         fillColor: const Color(0xFF1E293B),
                         hintText: 'e.g., Walk 200m north to next junction...',
                         hintStyle: const TextStyle(
-                            color: Colors.white38, fontSize: 12),
+                          color: Colors.white38,
+                          fontSize: 12,
+                        ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
-                          borderSide:
-                              const BorderSide(color: Color(0xFF334155)),
+                          borderSide: const BorderSide(
+                            color: Color(0xFF334155),
+                          ),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
-                          borderSide:
-                              const BorderSide(color: Color(0xFF334155)),
+                          borderSide: const BorderSide(
+                            color: Color(0xFF334155),
+                          ),
                         ),
                       ),
                     ),
@@ -176,8 +256,10 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(dialogCtx).pop(),
-                  child: const Text('Cancel',
-                      style: TextStyle(color: Colors.white60)),
+                  child: const Text(
+                    'Cancel',
+                    style: TextStyle(color: Colors.white60),
+                  ),
                 ),
                 FilledButton.icon(
                   onPressed: () {
@@ -190,7 +272,8 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text(
-                            'Stop "$stopName" invalidated. Detour removed & redirected to $selectedTargetStop.'),
+                          'Stop "$stopName" invalidated. Detour removed & redirected to $selectedTargetStop.',
+                        ),
                         backgroundColor: const Color(0xFF0F172A),
                         behavior: SnackBarBehavior.floating,
                       ),
@@ -226,9 +309,7 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
             width: 360,
             decoration: const BoxDecoration(
               color: Color(0xFF0F172A),
-              border: Border(
-                right: BorderSide(color: Color(0xFF1E293B)),
-              ),
+              border: Border(right: BorderSide(color: Color(0xFF1E293B))),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -237,7 +318,9 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
                 Container(
                   padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
                   decoration: const BoxDecoration(
-                    border: Border(bottom: BorderSide(color: Color(0xFF1E293B))),
+                    border: Border(
+                      bottom: BorderSide(color: Color(0xFF1E293B)),
+                    ),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -250,30 +333,44 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
                               color: AppColors.primary.withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(10),
                             ),
-                            child: const Icon(Icons.map_rounded,
-                                color: Color(0xFF60A5FA), size: 22),
+                            child: const Icon(
+                              Icons.map_rounded,
+                              color: Color(0xFF60A5FA),
+                              size: 22,
+                            ),
                           ),
                           const SizedBox(width: 12),
                           const Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text('Fleet Live Map',
-                                    style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.w800)),
-                                Text('5 Routes • Real-time GPS',
-                                    style: TextStyle(
-                                        color: Colors.white60, fontSize: 11)),
+                                Text(
+                                  'Fleet Dispatch Simulator',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                Text(
+                                  '20 Hyderabad routes • Simulated dispatch',
+                                  style: TextStyle(
+                                    color: Colors.white60,
+                                    fontSize: 11,
+                                  ),
+                                ),
                               ],
                             ),
                           ),
                           Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 4),
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF10B981).withValues(alpha: 0.2),
+                              color: const Color(
+                                0xFFF59E0B,
+                              ).withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(99),
                             ),
                             child: Row(
@@ -282,16 +379,19 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
                                   width: 6,
                                   height: 6,
                                   decoration: const BoxDecoration(
-                                    color: Color(0xFF10B981),
+                                    color: Color(0xFFF59E0B),
                                     shape: BoxShape.circle,
                                   ),
                                 ),
                                 const SizedBox(width: 4),
-                                const Text('LIVE',
-                                    style: TextStyle(
-                                        color: Color(0xFF10B981),
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w800)),
+                                const Text(
+                                  'DEMO',
+                                  style: TextStyle(
+                                    color: Color(0xFFFBBF24),
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
                               ],
                             ),
                           ),
@@ -299,40 +399,79 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
                       ),
                       const SizedBox(height: 14),
 
+                      if (breakdown == null) ...[
+                        Text(
+                          'Demo scenario: $_simulatedStrandedPassengers stranded passengers',
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        Slider(
+                          value: _simulatedStrandedPassengers.toDouble(),
+                          min: 1,
+                          max: 60,
+                          divisions: 59,
+                          label: '$_simulatedStrandedPassengers',
+                          onChanged: (value) => setState(() {
+                            _simulatedStrandedPassengers = value.round();
+                          }),
+                        ),
+                      ],
+
                       // Simulation Breakdown Trigger Button
                       if (breakdown == null)
                         SizedBox(
                           width: double.infinity,
                           child: FilledButton.icon(
-                            onPressed: () {
-                              provider.triggerAutomatedBreakdownReroute(
+                            onPressed: () async {
+                              final applied = await provider
+                                  .triggerAutomatedBreakdownReroute(
                                 busNumber: 'SB-04',
                                 busName: 'Campus Express',
                                 inchargeName: 'Meera Singh',
                                 reason: 'Engine Breakdown',
-                                location: 'Tech Park Gate (2 km)',
-                                strandedStudentsCount: 15,
+                                location: 'Aziz Nagar / TSPA Junction',
+                                strandedStudentsCount:
+                                    _simulatedStrandedPassengers,
                               );
+                              if (!context.mounted) return;
+                              if (!applied) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Could not create the dispatch plan. Check the backend connection and login role.',
+                                    ),
+                                  ),
+                                );
+                                return;
+                              }
                               setState(() {
                                 _isBreakdownTabSelected = true;
                               });
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
                                   content: Text(
-                                      '🚨 Simulated breakdown on Bus SB-04. Auto-rerouting activated!'),
+                                    '🚨 Java dispatch plan created for SB-04.',
+                                  ),
                                   backgroundColor: AppColors.danger,
                                   behavior: SnackBarBehavior.floating,
                                 ),
                               );
                             },
-                            icon: const Icon(Icons.warning_amber_rounded, size: 18),
+                            icon: const Icon(
+                              Icons.warning_amber_rounded,
+                              size: 18,
+                            ),
                             label: const Text('Simulate SB-04 Breakdown'),
                             style: FilledButton.styleFrom(
                               backgroundColor: AppColors.danger,
                               foregroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(vertical: 12),
                               shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12)),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                             ),
                           ),
                         )
@@ -344,22 +483,27 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
                             color: AppColors.danger.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(14),
                             border: Border.all(
-                                color: AppColors.danger.withValues(alpha: 0.4)),
+                              color: AppColors.danger.withValues(alpha: 0.4),
+                            ),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
                                 children: [
-                                  const Icon(Icons.emergency_rounded,
-                                      color: AppColors.danger, size: 18),
+                                  const Icon(
+                                    Icons.emergency_rounded,
+                                    color: AppColors.danger,
+                                    size: 18,
+                                  ),
                                   const SizedBox(width: 8),
                                   Text(
                                     '${breakdown.brokenBusNumber} Breakdown',
                                     style: const TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w800,
-                                        fontSize: 13),
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 13,
+                                    ),
                                   ),
                                   const Spacer(),
                                   TextButton(
@@ -368,10 +512,13 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
                                       setState(() {
                                         _isBreakdownTabSelected = false;
                                       });
-                                      ScaffoldMessenger.of(context).showSnackBar(
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
                                         const SnackBar(
                                           content: Text(
-                                              'Breakdown resolved. Standard fleet paths restored.'),
+                                            'Breakdown resolved. Standard fleet paths restored.',
+                                          ),
                                           behavior: SnackBarBehavior.floating,
                                         ),
                                       );
@@ -380,36 +527,56 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
                                       foregroundColor: const Color(0xFF60A5FA),
                                       padding: EdgeInsets.zero,
                                       minimumSize: Size.zero,
-                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                      tapTargetSize:
+                                          MaterialTapTargetSize.shrinkWrap,
                                     ),
-                                    child: const Text('Resolve',
-                                        style: TextStyle(fontSize: 12)),
+                                    child: const Text(
+                                      'Resolve',
+                                      style: TextStyle(fontSize: 12),
+                                    ),
                                   ),
                                 ],
                               ),
                               const SizedBox(height: 6),
                               Container(
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 4),
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF10B981)
+                                  color: (breakdown.studentsUnassigned == 0
+                                          ? const Color(0xFF10B981)
+                                          : const Color(0xFFF59E0B))
                                       .withValues(alpha: 0.2),
                                   borderRadius: BorderRadius.circular(6),
                                   border: Border.all(
-                                      color: const Color(0xFF10B981)
-                                          .withValues(alpha: 0.5)),
+                                    color: (breakdown.studentsUnassigned == 0
+                                            ? const Color(0xFF10B981)
+                                            : const Color(0xFFF59E0B))
+                                        .withValues(alpha: 0.5),
+                                  ),
                                 ),
                                 child: Row(
                                   children: [
-                                    const Icon(Icons.verified_rounded,
-                                        color: Color(0xFF10B981), size: 14),
+                                    Icon(
+                                      breakdown.studentsUnassigned == 0
+                                          ? Icons.verified_rounded
+                                          : Icons.warning_amber_rounded,
+                                      color: breakdown.studentsUnassigned == 0
+                                          ? const Color(0xFF34D399)
+                                          : const Color(0xFFFBBF24),
+                                      size: 14,
+                                    ),
                                     const SizedBox(width: 6),
                                     Text(
-                                      '100% Coverage (${breakdown.coveredRemainingStops}/${breakdown.totalRemainingStops} Stops Handled)',
-                                      style: const TextStyle(
-                                          color: Color(0xFF34D399),
-                                          fontWeight: FontWeight.w800,
-                                          fontSize: 11),
+                                      '${breakdown.studentsCovered}/${breakdown.strandedStudentsCount} Passengers Covered • ${breakdown.coveredRemainingStops}/${breakdown.totalRemainingStops} Groups',
+                                      style: TextStyle(
+                                        color: breakdown.studentsUnassigned == 0
+                                            ? const Color(0xFF34D399)
+                                            : const Color(0xFFFBBF24),
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 11,
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -420,7 +587,8 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
                               InkWell(
                                 onTap: () {
                                   setState(() {
-                                    _isBreakdownTabSelected = !_isBreakdownTabSelected;
+                                    _isBreakdownTabSelected =
+                                        !_isBreakdownTabSelected;
                                     _selectedRoute = null;
                                     _selectedStop = null;
                                   });
@@ -429,10 +597,14 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
                                 child: Container(
                                   width: double.infinity,
                                   padding: const EdgeInsets.symmetric(
-                                      horizontal: 10, vertical: 8),
+                                    horizontal: 10,
+                                    vertical: 8,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: _isBreakdownTabSelected
-                                        ? AppColors.danger.withValues(alpha: 0.35)
+                                        ? AppColors.danger.withValues(
+                                            alpha: 0.35,
+                                          )
                                         : const Color(0xFF1E293B),
                                     borderRadius: BorderRadius.circular(8),
                                     border: Border.all(
@@ -467,15 +639,21 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
                                       ),
                                       Container(
                                         padding: const EdgeInsets.symmetric(
-                                            horizontal: 6, vertical: 2),
+                                          horizontal: 6,
+                                          vertical: 2,
+                                        ),
                                         decoration: BoxDecoration(
                                           color: _isBreakdownTabSelected
                                               ? AppColors.danger
                                               : Colors.white10,
-                                          borderRadius: BorderRadius.circular(6),
+                                          borderRadius: BorderRadius.circular(
+                                            6,
+                                          ),
                                         ),
                                         child: Text(
-                                          _isBreakdownTabSelected ? 'OPEN' : 'VIEW STOPS',
+                                          _isBreakdownTabSelected
+                                              ? 'OPEN'
+                                              : 'VIEW STOPS',
                                           style: const TextStyle(
                                             color: Colors.white,
                                             fontSize: 9,
@@ -497,16 +675,22 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
                 // Tab Switcher / Navigation indicator
                 if (breakdown != null)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
                     decoration: const BoxDecoration(
                       color: Color(0xFF1E293B),
-                      border: Border(bottom: BorderSide(color: Color(0xFF334155))),
+                      border: Border(
+                        bottom: BorderSide(color: Color(0xFF334155)),
+                      ),
                     ),
                     child: Row(
                       children: [
                         Expanded(
                           child: InkWell(
-                            onTap: () => setState(() => _isBreakdownTabSelected = false),
+                            onTap: () =>
+                                setState(() => _isBreakdownTabSelected = false),
                             child: Container(
                               padding: const EdgeInsets.symmetric(vertical: 6),
                               decoration: BoxDecoration(
@@ -537,7 +721,8 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: InkWell(
-                            onTap: () => setState(() => _isBreakdownTabSelected = true),
+                            onTap: () =>
+                                setState(() => _isBreakdownTabSelected = true),
                             child: Container(
                               padding: const EdgeInsets.symmetric(vertical: 6),
                               decoration: BoxDecoration(
@@ -572,88 +757,109 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
                 // Main Sidebar Content: Either Breakdown Stops View OR Standard 5 Route List
                 Expanded(
                   child: _isBreakdownTabSelected && breakdown != null
-                      ? _buildBreakdownStopsTab(context, provider, breakdown, routes)
+                      ? _buildBreakdownStopsTab(
+                          context,
+                          provider,
+                          breakdown,
+                          routes,
+                        )
                       : ListView.builder(
                           padding: const EdgeInsets.all(12),
                           itemCount: routes.length,
                           itemBuilder: (context, i) {
                             final r = routes[i];
-                      final isSelected = _selectedRoute?.id == r.id;
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? r.color.withValues(alpha: 0.18)
-                              : const Color(0xFF1E293B).withValues(alpha: 0.6),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(
-                            color: isSelected
-                                ? r.color
-                                : r.isBrokenDown
-                                    ? AppColors.danger
-                                    : Colors.transparent,
-                            width: 1.5,
-                          ),
-                        ),
-                        child: ListTile(
-                          onTap: () {
-                            setState(() {
-                              _selectedRoute = isSelected ? null : r;
-                              _selectedStop = null;
-                            });
+                            final isSelected = _selectedRoute?.id == r.id;
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? r.color.withValues(alpha: 0.18)
+                                    : const Color(
+                                        0xFF1E293B,
+                                      ).withValues(alpha: 0.6),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: isSelected
+                                      ? r.color
+                                      : r.isBrokenDown
+                                          ? AppColors.danger
+                                          : Colors.transparent,
+                                  width: 1.5,
+                                ),
+                              ),
+                              child: ListTile(
+                                onTap: () {
+                                  setState(() {
+                                    _selectedRoute = isSelected ? null : r;
+                                    _selectedStop = null;
+                                  });
+                                },
+                                leading: CircleAvatar(
+                                  backgroundColor: r.isBrokenDown
+                                      ? AppColors.danger
+                                      : r.color,
+                                  radius: 16,
+                                  child: Icon(
+                                    r.isBrokenDown
+                                        ? Icons.warning_rounded
+                                        : Icons.directions_bus_filled_rounded,
+                                    color: Colors.white,
+                                    size: 16,
+                                  ),
+                                ),
+                                title: Text(
+                                  r.name,
+                                  style: TextStyle(
+                                    color: r.isBrokenDown
+                                        ? const Color(0xFFFCA5A5)
+                                        : Colors.white,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  '${r.busNumber} • ${r.stops.length} stops (${r.totalDistanceKm} km)',
+                                  style: const TextStyle(
+                                    color: Colors.white54,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                                trailing: r.isBrokenDown
+                                    ? Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 4,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.danger.withValues(
+                                            alpha: 0.2,
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                          border: Border.all(
+                                            color: AppColors.danger,
+                                            width: 0.8,
+                                          ),
+                                        ),
+                                        child: const Text(
+                                          'BREAKDOWN',
+                                          style: TextStyle(
+                                            color: AppColors.danger,
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.w900,
+                                          ),
+                                        ),
+                                      )
+                                    : Icon(
+                                        Icons.chevron_right_rounded,
+                                        color: r.color,
+                                        size: 18,
+                                      ),
+                              ),
+                            );
                           },
-                          leading: CircleAvatar(
-                            backgroundColor: r.isBrokenDown
-                                ? AppColors.danger
-                                : r.color,
-                            radius: 16,
-                            child: Icon(
-                              r.isBrokenDown
-                                  ? Icons.warning_rounded
-                                  : Icons.directions_bus_filled_rounded,
-                              color: Colors.white,
-                              size: 16,
-                            ),
-                          ),
-                          title: Text(
-                            r.name,
-                            style: TextStyle(
-                              color: r.isBrokenDown
-                                  ? const Color(0xFFFCA5A5)
-                                  : Colors.white,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          subtitle: Text(
-                            '${r.busNumber} • ${r.stops.length} stops (${r.totalDistanceKm} km)',
-                            style: const TextStyle(
-                                color: Colors.white54, fontSize: 11),
-                          ),
-                          trailing: r.isBrokenDown
-                              ? Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.danger.withValues(alpha: 0.2),
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(
-                                        color: AppColors.danger, width: 0.8),
-                                  ),
-                                  child: const Text(
-                                    'BREAKDOWN',
-                                    style: TextStyle(
-                                        color: AppColors.danger,
-                                        fontSize: 9,
-                                        fontWeight: FontWeight.w900),
-                                  ),
-                                )
-                              : Icon(Icons.chevron_right_rounded,
-                                  color: r.color, size: 18),
                         ),
-                      );
-                    },
-                  ),
                 ),
 
                 // Selected Stop Info & Manual Reassign Tool
@@ -662,7 +868,9 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
                     padding: const EdgeInsets.all(16),
                     decoration: const BoxDecoration(
                       color: Color(0xFF1E293B),
-                      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                      borderRadius: BorderRadius.vertical(
+                        top: Radius.circular(20),
+                      ),
                       border: Border(top: BorderSide(color: Color(0xFF334155))),
                     ),
                     child: Column(
@@ -670,22 +878,30 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
                       children: [
                         Row(
                           children: [
-                            const Icon(Icons.location_on_rounded,
-                                color: Color(0xFF60A5FA), size: 18),
+                            const Icon(
+                              Icons.location_on_rounded,
+                              color: Color(0xFF60A5FA),
+                              size: 18,
+                            ),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
                                 _selectedStop!.name,
                                 style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w800),
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w800,
+                                ),
                               ),
                             ),
                             IconButton(
-                              onPressed: () => setState(() => _selectedStop = null),
-                              icon: const Icon(Icons.close_rounded,
-                                  color: Colors.white54, size: 18),
+                              onPressed: () =>
+                                  setState(() => _selectedStop = null),
+                              icon: const Icon(
+                                Icons.close_rounded,
+                                color: Colors.white54,
+                                size: 18,
+                              ),
                               padding: EdgeInsets.zero,
                               constraints: const BoxConstraints(),
                             ),
@@ -694,33 +910,60 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
                         const SizedBox(height: 4),
                         Text(
                           'Landmark: ${_selectedStop!.landmark} (Stop #${_selectedStop!.order})',
-                          style: const TextStyle(color: Colors.white60, fontSize: 11),
+                          style: const TextStyle(
+                            color: Colors.white60,
+                            fontSize: 11,
+                          ),
                         ),
                         const SizedBox(height: 12),
-                        const Text('Reassign stop to another bus:',
-                            style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600)),
+                        const Text(
+                          'Reassign stop to another bus:',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                         const SizedBox(height: 6),
                         Wrap(
                           spacing: 6,
                           runSpacing: 6,
                           children: routes.map((rt) {
-                            final isCurrent = _selectedStop!.assignedPickupBusNumber == rt.busNumber ||
-                                (_selectedStop!.assignedPickupBusNumber == null && _selectedRoute?.busNumber == rt.busNumber);
+                            final isCurrent = _selectedStop!
+                                        .assignedPickupBusNumber ==
+                                    rt.busNumber ||
+                                (_selectedStop!.assignedPickupBusNumber ==
+                                        null &&
+                                    _selectedRoute?.busNumber == rt.busNumber);
                             return FilterChip(
-                              label: Text(rt.busNumber,
-                                  style: TextStyle(
-                                      color: isCurrent ? Colors.white : Colors.white70,
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700)),
+                              label: Text(
+                                rt.busNumber,
+                                style: TextStyle(
+                                  color:
+                                      isCurrent ? Colors.white : Colors.white70,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
                               selected: isCurrent,
                               selectedColor: rt.color,
                               backgroundColor: const Color(0xFF0F172A),
                               onSelected: (_) {
-                                provider.adminReassignStopToBus(
-                                    _selectedStop!.id, rt.busNumber);
+                                final moved = provider.adminReassignStopToBus(
+                                  _selectedStop!.id,
+                                  rt.busNumber,
+                                );
+                                if (!moved) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        '${rt.busNumber} is unavailable or lacks spare seats for this passenger group.',
+                                      ),
+                                      behavior: SnackBarBehavior.floating,
+                                    ),
+                                  );
+                                  return;
+                                }
                                 setState(() {
                                   _selectedStop = _selectedStop!.copyWith(
                                     assignedPickupBusNumber: rt.busNumber,
@@ -729,7 +972,8 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
                                     content: Text(
-                                        'Reassigned "${_selectedStop!.name}" to ${rt.busNumber} (${rt.busName})'),
+                                      'Reassigned "${_selectedStop!.name}" to ${rt.busNumber} (${rt.busName})',
+                                    ),
                                     duration: const Duration(seconds: 2),
                                     behavior: SnackBarBehavior.floating,
                                   ),
@@ -749,20 +993,115 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
           Expanded(
             child: Stack(
               children: [
-                // Interactive InteractiveViewer Map
-                InteractiveViewer(
-                  boundaryMargin: const EdgeInsets.all(200),
-                  minScale: 0.6,
-                  maxScale: 3.5,
-                  child: CustomPaint(
-                    size: const Size(1200, 900),
-                    painter: _UnifiedFleetMapPainter(
-                      routes: routes,
-                      breakdown: breakdown,
-                      selectedRouteId: _selectedRoute?.id,
-                      selectedStopId: _selectedStop?.id,
+                osm.FlutterMap(
+                  mapController: _mapController,
+                  options: osm.MapOptions(
+                    initialCenter: const geo.LatLng(17.348301, 78.339918),
+                    initialZoom: 10.8,
+                    interactionOptions: const osm.InteractionOptions(
+                      flags: osm.InteractiveFlag.all,
+                    ),
+                    initialCameraFit: osm.CameraFit.bounds(
+                      bounds: osm.LatLngBounds.fromPoints(
+                          routes.expand((route) => _pathFor(route)).toList()),
+                      padding: const EdgeInsets.all(72),
                     ),
                   ),
+                  children: [
+                    osm.TileLayer(
+                      urlTemplate:
+                          'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                      userAgentPackageName: 'com.example.smartbus',
+                    ),
+                    osm.PolylineLayer(
+                      polylines: routes
+                          .map((route) => osm.Polyline(
+                                points: _pathFor(route),
+                                color: route.color.withValues(
+                                    alpha: _selectedRoute == null ||
+                                            _selectedRoute!.id == route.id
+                                        ? 0.9
+                                        : 0.18),
+                                strokeWidth:
+                                    _selectedRoute?.id == route.id ? 5 : 3,
+                              ))
+                          .toList(),
+                    ),
+                    osm.MarkerLayer(markers: [
+                      for (final route in routes)
+                        for (final stop in route.stops)
+                          osm.Marker(
+                            point: _snapToRoute(
+                              geo.LatLng(stop.latitude, stop.longitude),
+                              _pathFor(route),
+                            ),
+                            width: 34,
+                            height: 38,
+                            child: GestureDetector(
+                              onTap: () => setState(() {
+                                _selectedRoute = route;
+                                _selectedStop = stop;
+                              }),
+                              child: Tooltip(
+                                message: '${route.busNumber} · ${stop.name}',
+                                child: Icon(Icons.location_on,
+                                    size: 32,
+                                    color: stop.isInvalidated
+                                        ? Colors.grey
+                                        : stop.isBreakdownStranded
+                                            ? Colors.red
+                                            : route.color),
+                              ),
+                            ),
+                          ),
+                      for (final route in routes)
+                        if (_pathFor(route).length > 1)
+                          osm.Marker(
+                            point: _positionOnRoute(
+                                _pathFor(route), routes.indexOf(route) * 0.11),
+                            width: 48,
+                            height: 48,
+                            child: GestureDetector(
+                              onTap: () => setState(() {
+                                _selectedRoute = route;
+                                _selectedStop = null;
+                              }),
+                              child: Tooltip(
+                                message:
+                                    '${route.busNumber} · simulated bus position',
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    color: route.isBrokenDown
+                                        ? Colors.red
+                                        : route.color,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                        color: Colors.white, width: 3),
+                                    boxShadow: const [
+                                      BoxShadow(
+                                          color: Colors.black38, blurRadius: 8)
+                                    ],
+                                  ),
+                                  child: const Icon(Icons.directions_bus,
+                                      color: Colors.white, size: 24),
+                                ),
+                              ),
+                            ),
+                          ),
+                      osm.Marker(
+                        point: geo.LatLng(HyderabadRouteData.campus.latitude,
+                            HyderabadRouteData.campus.longitude),
+                        width: 40,
+                        height: 44,
+                        child: const Tooltip(
+                            message: 'KLH Aziz Nagar Campus',
+                            child: Icon(Icons.school,
+                                color: Colors.black87, size: 32)),
+                      ),
+                    ]),
+                    osm.SimpleAttributionWidget(
+                        source: const Text('OpenStreetMap contributors')),
+                  ],
                 ),
 
                 // Map Overlay Top Bar (Stats & Legend)
@@ -774,30 +1113,35 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
                     children: [
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 10),
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
                         decoration: BoxDecoration(
                           color: const Color(0xFF0F172A).withValues(alpha: 0.9),
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(color: const Color(0xFF1E293B)),
                           boxShadow: const [
                             BoxShadow(
-                                color: Colors.black45,
-                                blurRadius: 14,
-                                offset: Offset(0, 6))
+                              color: Colors.black45,
+                              blurRadius: 14,
+                              offset: Offset(0, 6),
+                            ),
                           ],
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            _routeBadge('Route 1 (North)', const Color(0xFF2563EB)),
-                            const SizedBox(width: 10),
-                            _routeBadge('Route 2 (West)', const Color(0xFF7C3AED)),
-                            const SizedBox(width: 10),
-                            _routeBadge('Route 3 (South)', const Color(0xFF10B981)),
-                            const SizedBox(width: 10),
-                            _routeBadge('Route 4 (East)', const Color(0xFFF59E0B)),
-                            const SizedBox(width: 10),
-                            _routeBadge('Route 5 (Outer)', const Color(0xFFEC4899)),
+                            const Icon(Icons.directions_bus_filled,
+                                color: Color(0xFF34D399), size: 18),
+                            const SizedBox(width: 8),
+                            Text(
+                              '${routes.length} routes · drag to pan · scroll or pinch to zoom',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 12,
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -805,30 +1149,39 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
                       if (breakdown != null)
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 10),
+                            horizontal: 14,
+                            vertical: 10,
+                          ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF7F1D1D).withValues(alpha: 0.95),
+                            color: const Color(
+                              0xFF7F1D1D,
+                            ).withValues(alpha: 0.95),
                             borderRadius: BorderRadius.circular(16),
                             border: Border.all(color: AppColors.danger),
                             boxShadow: const [
                               BoxShadow(
-                                  color: Colors.black45,
-                                  blurRadius: 14,
-                                  offset: Offset(0, 6))
+                                color: Colors.black45,
+                                blurRadius: 14,
+                                offset: Offset(0, 6),
+                              ),
                             ],
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.alt_route_rounded,
-                                  color: Color(0xFFFDE047), size: 18),
+                              const Icon(
+                                Icons.alt_route_rounded,
+                                color: Color(0xFFFDE047),
+                                size: 18,
+                              ),
                               const SizedBox(width: 8),
                               Text(
-                                'Detour Active: ${breakdown.assignedPickupBusNumber} Rescue Path (+${breakdown.detourDistanceKm} km)',
+                                'Rescue fleet: ${breakdown.rescueBusNumbers.isEmpty ? "none available" : breakdown.rescueBusNumbers.join(" + ")} (+${breakdown.detourDistanceKm.toStringAsFixed(1)} km est.)',
                                 style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 12),
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 12,
+                                ),
                               ),
                             ],
                           ),
@@ -843,15 +1196,40 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
                   right: 20,
                   child: Column(
                     children: [
-                      _mapFab(Icons.layers_rounded, 'Reset View', () {
+                      _mapFab(Icons.add, 'Zoom in', () {
+                        _mapController.move(
+                          _mapController.camera.center,
+                          _mapController.camera.zoom + 1,
+                        );
+                      }),
+                      const SizedBox(height: 8),
+                      _mapFab(Icons.remove, 'Zoom out', () {
+                        _mapController.move(
+                          _mapController.camera.center,
+                          _mapController.camera.zoom - 1,
+                        );
+                      }),
+                      const SizedBox(height: 8),
+                      _mapFab(Icons.fit_screen_rounded, 'Fit all routes', () {
                         setState(() {
                           _selectedRoute = null;
                           _selectedStop = null;
                         });
+                        _mapController.fitCamera(osm.CameraFit.bounds(
+                          bounds: osm.LatLngBounds.fromPoints(
+                            context
+                                .read<SmartBusProvider>()
+                                .liveRoutes
+                                .expand(_pathFor)
+                                .toList(),
+                          ),
+                          padding: const EdgeInsets.all(72),
+                        ));
                       }),
                       const SizedBox(height: 10),
                       _mapFab(Icons.info_outline_rounded, 'Stops Info', () {
-                        if (routes.isNotEmpty && routes.first.stops.isNotEmpty) {
+                        if (routes.isNotEmpty &&
+                            routes.first.stops.isNotEmpty) {
                           setState(() {
                             _selectedRoute = routes.first;
                             _selectedStop = routes.first.stops[2];
@@ -875,17 +1253,17 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
           Container(
             width: 10,
             height: 10,
-            decoration: BoxDecoration(
-              color: color,
-              shape: BoxShape.circle,
-            ),
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
           ),
           const SizedBox(width: 6),
-          Text(label,
-              style: const TextStyle(
-                  color: Colors.white70,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600)),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ],
       );
 
@@ -915,7 +1293,11 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
 
     final stops = brokenRoute?.stops ?? [];
     // Identify broken stop order (usually stops from index 2 onwards are remaining)
-    final remainingStops = stops.where((s) => s.order >= 3).toList();
+    final remainingStops = stops
+        .where(
+          (s) => s.order >= 3 && breakdown.affectedStopNames.contains(s.name),
+        )
+        .toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -942,18 +1324,19 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
                     ),
                     const Text(
                       'Per-stop bus reassignment & student invalidation',
-                      style: TextStyle(
-                        color: Colors.white54,
-                        fontSize: 10,
-                      ),
+                      style: TextStyle(color: Colors.white54, fontSize: 10),
                     ),
                   ],
                 ),
               ),
               IconButton(
-                onPressed: () => setState(() => _isBreakdownTabSelected = false),
-                icon: const Icon(Icons.close_rounded,
-                    color: Colors.white54, size: 18),
+                onPressed: () =>
+                    setState(() => _isBreakdownTabSelected = false),
+                icon: const Icon(
+                  Icons.close_rounded,
+                  color: Colors.white54,
+                  size: 18,
+                ),
                 tooltip: 'Back to Route List',
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
@@ -972,11 +1355,12 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
               final isInvalidated = stop.isInvalidated;
 
               // Find current assignment from breakdown or stop
-              final assignmentMatch = breakdown.stopAssignments
-                  .where((a) => a.stopId == stop.id);
+              final assignmentMatch = breakdown.stopAssignments.where(
+                (a) => a.stopId == stop.id,
+              );
               final currentAssignedBus = assignmentMatch.isNotEmpty
                   ? assignmentMatch.first.assignedBusNumber
-                  : (stop.assignedPickupBusNumber ?? 'SB-12');
+                  : (stop.assignedPickupBusNumber ?? 'Unassigned');
 
               return Container(
                 margin: const EdgeInsets.only(bottom: 10),
@@ -1050,10 +1434,13 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
                           if (isInvalidated)
                             Container(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 6, vertical: 2),
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF64748B)
-                                    .withValues(alpha: 0.3),
+                                color: const Color(
+                                  0xFF64748B,
+                                ).withValues(alpha: 0.3),
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: const Text(
@@ -1068,10 +1455,13 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
                           else
                             Container(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 6, vertical: 2),
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF10B981)
-                                    .withValues(alpha: 0.2),
+                                color: const Color(
+                                  0xFF10B981,
+                                ).withValues(alpha: 0.2),
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: const Text(
@@ -1095,18 +1485,22 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
                             color: const Color(0xFF0F172A),
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
-                                color: const Color(0xFF334155), width: 0.8),
+                              color: const Color(0xFF334155),
+                              width: 0.8,
+                            ),
                           ),
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Icon(Icons.directions_walk_rounded,
-                                  color: Color(0xFF38BDF8), size: 16),
+                              const Icon(
+                                Icons.directions_walk_rounded,
+                                color: Color(0xFF38BDF8),
+                                size: 16,
+                              ),
                               const SizedBox(width: 6),
                               Expanded(
                                 child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
                                       'Redirected to: ${stop.redirectToStopName}',
@@ -1135,6 +1529,18 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
                       // Bus Reassignment Chips (Active stops only)
                       if (!isInvalidated) ...[
                         const SizedBox(height: 10),
+                        Text(
+                          assignmentMatch.isNotEmpty
+                              ? '${assignmentMatch.first.studentCount} estimated passengers • ${assignmentMatch.first.spareSeatsBefore} spare seats before assignment • ${assignmentMatch.first.detourDistanceKm.toStringAsFixed(1)} km straight-line detour estimate'
+                              : '${breakdown.unassignedStudentsByStop[stop.id] ?? 0} estimated passengers • no single active bus currently has enough spare seats',
+                          style: TextStyle(
+                            color: assignmentMatch.isNotEmpty
+                                ? Colors.white70
+                                : const Color(0xFFFBBF24),
+                            fontSize: 10,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
                         const Text(
                           'Assigned Rescue Bus:',
                           style: TextStyle(
@@ -1148,7 +1554,9 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
                           spacing: 6,
                           runSpacing: 6,
                           children: routes
-                              .where((r) => r.busNumber != breakdown.brokenBusNumber)
+                              .where(
+                            (r) => r.busNumber != breakdown.brokenBusNumber,
+                          )
                               .map((rt) {
                             final isAssigned =
                                 currentAssignedBus == rt.busNumber;
@@ -1167,15 +1575,35 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
                               selectedColor: rt.color,
                               backgroundColor: const Color(0xFF0F172A),
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 6, vertical: 0),
+                                horizontal: 6,
+                                vertical: 0,
+                              ),
                               onSelected: (selected) {
                                 if (selected) {
-                                  provider.adminReassignStopToBus(
-                                      stop.id, rt.busNumber);
-                                  ScaffoldMessenger.of(context).showSnackBar(
+                                  final moved = provider.adminReassignStopToBus(
+                                    stop.id,
+                                    rt.busNumber,
+                                  );
+                                  if (!moved) {
+                                    ScaffoldMessenger.of(
+                                      context,
+                                    ).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          '${rt.busNumber} is unavailable or lacks spare seats for this passenger group.',
+                                        ),
+                                        behavior: SnackBarBehavior.floating,
+                                      ),
+                                    );
+                                    return;
+                                  }
+                                  ScaffoldMessenger.of(
+                                    context,
+                                  ).showSnackBar(
                                     SnackBar(
                                       content: Text(
-                                          'Assigned "${stop.name}" to ${rt.busNumber} (${rt.busName})'),
+                                        'Assigned "${stop.name}" to ${rt.busNumber} (${rt.busName})',
+                                      ),
                                       duration: const Duration(seconds: 2),
                                       behavior: SnackBarBehavior.floating,
                                     ),
@@ -1202,18 +1630,24 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
                                     content: Text(
-                                        'Stop "${stop.name}" reactivated and restored to rescue path.'),
+                                      'Stop "${stop.name}" reactivated and restored to rescue path.',
+                                    ),
                                     duration: const Duration(seconds: 2),
                                     behavior: SnackBarBehavior.floating,
                                   ),
                                 );
                               },
-                              icon: const Icon(Icons.replay_rounded,
-                                  size: 14, color: Color(0xFF34D399)),
+                              icon: const Icon(
+                                Icons.replay_rounded,
+                                size: 14,
+                                color: Color(0xFF34D399),
+                              ),
                               label: const Text(
                                 'Reactivate Stop',
                                 style: TextStyle(
-                                    color: Color(0xFF34D399), fontSize: 11),
+                                  color: Color(0xFF34D399),
+                                  fontSize: 11,
+                                ),
                               ),
                             )
                           else
@@ -1225,8 +1659,11 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
                                 stop.name,
                                 routes,
                               ),
-                              icon: const Icon(Icons.do_not_disturb_on_outlined,
-                                  size: 14, color: Color(0xFFFCA5A5)),
+                              icon: const Icon(
+                                Icons.do_not_disturb_on_outlined,
+                                size: 14,
+                                color: Color(0xFFFCA5A5),
+                              ),
                               label: const Text(
                                 'Invalidate & Redirect',
                                 style: TextStyle(
@@ -1237,9 +1674,13 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
                               ),
                               style: OutlinedButton.styleFrom(
                                 side: const BorderSide(
-                                    color: Color(0xFF7F1D1D), width: 0.8),
+                                  color: Color(0xFF7F1D1D),
+                                  width: 0.8,
+                                ),
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 4),
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
                                 visualDensity: VisualDensity.compact,
                               ),
                             ),
@@ -1285,21 +1726,23 @@ class _UnifiedFleetMapPainter extends CustomPainter {
     final campusPaint = Paint()..color = const Color(0xFF38BDF8);
     canvas.drawCircle(Offset(cx, cy), 18, campusPaint);
     canvas.drawCircle(
-        Offset(cx, cy),
-        26,
-        Paint()
-          ..color = const Color(0xFF38BDF8).withValues(alpha: 0.25)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 3);
+      Offset(cx, cy),
+      26,
+      Paint()
+        ..color = const Color(0xFF38BDF8).withValues(alpha: 0.25)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3,
+    );
 
     final textPainter = TextPainter(
       text: const TextSpan(
         text: '🏛️ Campus Gate',
         style: TextStyle(
-            color: Colors.white,
-            fontSize: 12,
-            fontWeight: FontWeight.w800,
-            backgroundColor: Color(0xCC0F172A)),
+          color: Colors.white,
+          fontSize: 12,
+          fontWeight: FontWeight.w800,
+          backgroundColor: Color(0xCC0F172A),
+        ),
       ),
       textDirection: TextDirection.ltr,
     )..layout();
@@ -1359,9 +1802,10 @@ class _UnifiedFleetMapPainter extends CustomPainter {
         final isInvalidated = stop.isInvalidated;
 
         final isStranded = (stop.isBreakdownStranded ||
-            (breakdown != null &&
-                breakdown!.brokenBusNumber == route.busNumber &&
-                i >= 2)) && !isInvalidated;
+                (breakdown != null &&
+                    breakdown!.brokenBusNumber == route.busNumber &&
+                    i >= 2)) &&
+            !isInvalidated;
 
         final pinColor = isInvalidated
             ? const Color(0xFF64748B)
@@ -1374,22 +1818,27 @@ class _UnifiedFleetMapPainter extends CustomPainter {
         // Outer pulse circle for stranded stops
         if (isStranded) {
           canvas.drawCircle(
-              pt,
-              16,
-              Paint()
-                ..color = AppColors.danger.withValues(alpha: 0.35)
-                ..style = PaintingStyle.stroke
-                ..strokeWidth = 3);
+            pt,
+            16,
+            Paint()
+              ..color = AppColors.danger.withValues(alpha: 0.35)
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = 3,
+          );
         }
 
         // Draw walking vector line if stop is invalidated & redirected
         if (isInvalidated && stop.redirectToStopName != null) {
           // Find the target redirect stop position
           for (final r in routes) {
-            final targetMatches = r.stops.where((s) => s.name == stop.redirectToStopName);
+            final targetMatches = r.stops.where(
+              (s) => s.name == stop.redirectToStopName,
+            );
             if (targetMatches.isNotEmpty) {
               final targetPt = toCanvasOffset(
-                  targetMatches.first.latitude, targetMatches.first.longitude);
+                targetMatches.first.latitude,
+                targetMatches.first.longitude,
+              );
 
               // Dotted/dashed walking vector
               final walkPaint = Paint()
@@ -1404,7 +1853,10 @@ class _UnifiedFleetMapPainter extends CustomPainter {
               final dy = (targetPt.dy - pt.dy) / distance;
               double currentDist = 0.0;
               while (currentDist < distance) {
-                final start = Offset(pt.dx + dx * currentDist, pt.dy + dy * currentDist);
+                final start = Offset(
+                  pt.dx + dx * currentDist,
+                  pt.dy + dy * currentDist,
+                );
                 final endDist = math.min(currentDist + dashWidth, distance);
                 final end = Offset(pt.dx + dx * endDist, pt.dy + dy * endDist);
                 canvas.drawLine(start, end, walkPaint);
@@ -1412,7 +1864,10 @@ class _UnifiedFleetMapPainter extends CustomPainter {
               }
 
               // Walking icon badge halfway
-              final midPt = Offset((pt.dx + targetPt.dx) / 2, (pt.dy + targetPt.dy) / 2);
+              final midPt = Offset(
+                (pt.dx + targetPt.dx) / 2,
+                (pt.dy + targetPt.dy) / 2,
+              );
               final walkBadge = TextPainter(
                 text: const TextSpan(
                   text: '🚶 Walk to Pickup',
@@ -1425,7 +1880,10 @@ class _UnifiedFleetMapPainter extends CustomPainter {
                 ),
                 textDirection: TextDirection.ltr,
               )..layout();
-              walkBadge.paint(canvas, Offset(midPt.dx - walkBadge.width / 2, midPt.dy - 12));
+              walkBadge.paint(
+                canvas,
+                Offset(midPt.dx - walkBadge.width / 2, midPt.dy - 12),
+              );
               break;
             }
           }
@@ -1434,12 +1892,13 @@ class _UnifiedFleetMapPainter extends CustomPainter {
         // Stop circle
         canvas.drawCircle(pt, isSelected ? 9 : 6, Paint()..color = pinColor);
         canvas.drawCircle(
-            pt,
-            isSelected ? 9 : 6,
-            Paint()
-              ..color = isInvalidated ? const Color(0xFF94A3B8) : Colors.white
-              ..style = PaintingStyle.stroke
-              ..strokeWidth = 1.8);
+          pt,
+          isSelected ? 9 : 6,
+          Paint()
+            ..color = isInvalidated ? const Color(0xFF94A3B8) : Colors.white
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.8,
+        );
 
         // Cross or inner mark for invalidated stop
         if (isInvalidated) {
@@ -1491,12 +1950,13 @@ class _UnifiedFleetMapPainter extends CustomPainter {
           // Broken Bus Warning Marker
           canvas.drawCircle(busPt, 18, Paint()..color = AppColors.danger);
           canvas.drawCircle(
-              busPt,
-              26,
-              Paint()
-                ..color = AppColors.danger.withValues(alpha: 0.4)
-                ..style = PaintingStyle.stroke
-                ..strokeWidth = 4);
+            busPt,
+            26,
+            Paint()
+              ..color = AppColors.danger.withValues(alpha: 0.4)
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = 4,
+          );
           final brokenBusLabel = TextPainter(
             text: TextSpan(
               text: '⚠️ ${route.busNumber} BROKEN DOWN',
@@ -1510,17 +1970,20 @@ class _UnifiedFleetMapPainter extends CustomPainter {
             textDirection: TextDirection.ltr,
           )..layout();
           brokenBusLabel.paint(
-              canvas, Offset(busPt.dx - brokenBusLabel.width / 2, busPt.dy - 32));
+            canvas,
+            Offset(busPt.dx - brokenBusLabel.width / 2, busPt.dy - 32),
+          );
         } else {
           // Active Moving Bus Marker
           canvas.drawCircle(busPt, 14, Paint()..color = route.color);
           canvas.drawCircle(
-              busPt,
-              14,
-              Paint()
-                ..color = Colors.white
-                ..style = PaintingStyle.stroke
-                ..strokeWidth = 2);
+            busPt,
+            14,
+            Paint()
+              ..color = Colors.white
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = 2,
+          );
 
           final busLabel = TextPainter(
             text: TextSpan(
@@ -1535,7 +1998,9 @@ class _UnifiedFleetMapPainter extends CustomPainter {
             textDirection: TextDirection.ltr,
           )..layout();
           busLabel.paint(
-              canvas, Offset(busPt.dx - busLabel.width / 2, busPt.dy - 22));
+            canvas,
+            Offset(busPt.dx - busLabel.width / 2, busPt.dy - 22),
+          );
         }
       }
     }
@@ -1560,17 +2025,21 @@ class _UnifiedFleetMapPainter extends CustomPainter {
   }
 
   void _drawOptimizedDetourPath(
-      Canvas canvas, Offset Function(double, double) toOffset) {
+    Canvas canvas,
+    Offset Function(double, double) toOffset,
+  ) {
     // Dynamically scan routes for any diverted stops assigned during breakdown
     for (final route in routes) {
       final divertedStops =
           route.stops.where((s) => s.isDivertedPickup).toList();
       if (divertedStops.isEmpty) continue;
 
-      final firstDivertedIndex =
-          route.stops.indexWhere((s) => s.isDivertedPickup);
-      final lastDivertedIndex =
-          route.stops.lastIndexWhere((s) => s.isDivertedPickup);
+      final firstDivertedIndex = route.stops.indexWhere(
+        (s) => s.isDivertedPickup,
+      );
+      final lastDivertedIndex = route.stops.lastIndexWhere(
+        (s) => s.isDivertedPickup,
+      );
 
       final prevStop = firstDivertedIndex > 0
           ? route.stops[firstDivertedIndex - 1]
@@ -1610,11 +2079,14 @@ class _UnifiedFleetMapPainter extends CustomPainter {
       // Draw U-Turn callout at the first diverted stop if U-turn is required
       final firstDiverted = divertedStops.first;
       if (firstDiverted.isUturnDetour) {
-        final uTurnPt =
-            toOffset(firstDiverted.latitude, firstDiverted.longitude);
+        final uTurnPt = toOffset(
+          firstDiverted.latitude,
+          firstDiverted.longitude,
+        );
         final uTurnBadge = TextPainter(
           text: TextSpan(
-            text: '↩️ U-TURN & DIVERT: ${route.busNumber} to ${firstDiverted.name}',
+            text:
+                '↩️ U-TURN & DIVERT: ${route.busNumber} to ${firstDiverted.name}',
             style: const TextStyle(
               color: Colors.black,
               fontSize: 10,

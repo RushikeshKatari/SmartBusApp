@@ -4,127 +4,209 @@ import com.smartbus.fleet.entity.Bus;
 import com.smartbus.fleet.entity.Stop;
 import com.smartbus.fleet.repository.BusRepository;
 import com.smartbus.fleet.repository.StopRepository;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-
-import java.util.*;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class RouteOptimizerService {
-
     private final BusRepository busRepository;
     private final StopRepository stopRepository;
+    private final OsmRoutingClient osmRouting;
 
-    public RouteOptimizerService(BusRepository busRepository, StopRepository stopRepository) {
+    public RouteOptimizerService(
+            BusRepository busRepository,
+            StopRepository stopRepository,
+            OsmRoutingClient osmRouting) {
         this.busRepository = busRepository;
         this.stopRepository = stopRepository;
+        this.osmRouting = osmRouting;
     }
+
+    public record StopAssignment(
+            String stopId,
+            String stopName,
+            String assignedBusNumber,
+            String assignedBusName,
+            String driverName,
+            String driverPhone,
+            double latitude,
+            double longitude,
+            int studentCount,
+            int spareSeatsBefore,
+            double detourDistanceKm,
+            int detourEtaMinutes,
+            String estimateSource) {}
 
     public record OptimalRerouteResult(
-        Bus selectedBus,
-        List<Stop> optimizedStopSequence,
-        double addedDistanceKm,
-        int addedDurationMinutes,
-        String reason,
-        int remainingStopsCoveredCount,
-        boolean allStopsCovered
-    ) {
-        public OptimalRerouteResult(Bus selectedBus, List<Stop> optimizedStopSequence, double addedDistanceKm, int addedDurationMinutes, String reason) {
-            this(selectedBus, optimizedStopSequence, addedDistanceKm, addedDurationMinutes, reason, optimizedStopSequence.size(), true);
-        }
-    }
+            List<StopAssignment> assignments,
+            Map<String, Integer> unassignedStudentsByStop,
+            int unassignedStudents,
+            int strandedStudents,
+            int affectedStopsCount,
+            int coveredStopsCount,
+            double totalDetourDistanceKm,
+            int estimatedAdditionalMinutes,
+            boolean allStopsCovered,
+            String explanation) {}
 
-    /**
-     * Automatically evaluates all fleet buses to pick the best bus for rescue/pickup,
-     * guarantees 100% remaining stop coverage, and calculates minimal detour insertion order.
-     */
+    /** Capacity-constrained, scarcity-first dispatch. An OSRM-compatible router supplies
+     * road distance/time when configured; without a key, estimates are marked
+     * as straight-line approximations. */
     public OptimalRerouteResult calculateOptimalReroute(
             UUID brokenBusId,
+            String brokenBusNumber,
             double breakdownLat,
             double breakdownLng,
-            int strandedStudents
-    ) {
-        List<Bus> allBuses = busRepository.findAll();
-        Bus bestBus = null;
-        double minScore = Double.MAX_VALUE;
+            int strandedStudents) {
+        Bus brokenBus = brokenBusId == null
+                ? busRepository.findByRegistrationNumberIgnoreCase(brokenBusNumber)
+                        .orElseThrow(() -> new ResponseStatusException(
+                                HttpStatus.NOT_FOUND, "Broken-down bus is not in the configured fleet"))
+                : busRepository.findById(brokenBusId)
+                        .orElseThrow(() -> new ResponseStatusException(
+                                HttpStatus.NOT_FOUND, "Broken-down bus is not in the configured fleet"));
 
-        for (Bus candidate : allBuses) {
-            if (candidate.id.equals(brokenBusId)) continue;
-
-            // Fetch candidate route stops
-            List<Stop> candidateStops = candidate.route != null
-                    ? stopRepository.findByRouteIdOrderByStopOrderAsc(candidate.route.id)
-                    : List.of();
-
-            // Calculate minimum distance from candidate stops to breakdown location
-            double minStopDist = Double.MAX_VALUE;
-            for (Stop s : candidateStops) {
-                if (s.latitude != 0.0 && s.longitude != 0.0) {
-                    double dist = distanceKm(s.latitude, s.longitude, breakdownLat, breakdownLng);
-                    if (dist < minStopDist) {
-                        minStopDist = dist;
-                    }
-                }
-            }
-            if (minStopDist == Double.MAX_VALUE) {
-                minStopDist = 5.0; // fallback estimate
-            }
-
-            // Score = Distance + Capacity Penalty
-            int capacity = candidate.capacity > 0 ? candidate.capacity : 50;
-            double capacityPenalty = strandedStudents > capacity ? 10.0 : 0.0;
-            double score = minStopDist + capacityPenalty;
-
-            if (score < minScore) {
-                minScore = score;
-                bestBus = candidate;
-            }
+        if (strandedStudents < 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Stranded passenger count cannot be negative");
         }
 
-        if (bestBus == null && !allBuses.isEmpty()) {
-            bestBus = allBuses.get(0);
+        List<Stop> routeStops = brokenBus.route == null
+                ? List.of()
+                : stopRepository.findByRouteIdOrderByStopOrderAsc(brokenBus.route.id);
+        List<Stop> affectedStops = routeStops.stream()
+                .skip(Math.min(2, routeStops.size()))
+                .filter(stop -> !isCampus(stop.name))
+                .limit(Math.max(0, strandedStudents))
+                .toList();
+
+        if (affectedStops.isEmpty() || strandedStudents == 0) {
+            return new OptimalRerouteResult(
+                    List.of(), Map.of(), strandedStudents, strandedStudents,
+                    affectedStops.size(), 0, 0, 0, affectedStops.isEmpty(),
+                    "No remaining pickup groups were found for this breakdown scenario.");
         }
 
-        List<Stop> combinedStops = new ArrayList<>();
-        int leftoverCount = 0;
-        if (brokenBusId != null) {
-            Optional<Bus> brokenBusOpt = busRepository.findById(brokenBusId);
-            if (brokenBusOpt.isPresent() && brokenBusOpt.get().route != null) {
-                List<Stop> brokenStops = stopRepository.findByRouteIdOrderByStopOrderAsc(brokenBusOpt.get().route.id);
-                List<Stop> remaining = brokenStops.stream()
-                        .filter(s -> !s.name.toLowerCase().contains("campus gate"))
-                        .skip(Math.min(2, brokenStops.size()))
-                        .toList();
-                leftoverCount = remaining.size();
-                combinedStops.addAll(remaining);
+        List<Bus> availableBuses = busRepository.findAll().stream()
+                .filter(bus -> !bus.id.equals(brokenBus.id))
+                .filter(bus -> bus.status != null &&
+                        (bus.status.equalsIgnoreCase("ACTIVE") || bus.status.equalsIgnoreCase("ON_DUTY")))
+                .filter(bus -> bus.route != null && bus.capacity > 0)
+                .toList();
+        Map<String, Integer> remainingSeats = new HashMap<>();
+        for (Bus bus : availableBuses) {
+            remainingSeats.put(bus.registrationNumber,
+                    Math.max(0, bus.capacity - Math.max(0, bus.currentOccupancy)));
+        }
+
+        int base = strandedStudents / affectedStops.size();
+        int remainder = strandedStudents % affectedStops.size();
+        List<Demand> demand = new ArrayList<>();
+        for (int i = 0; i < affectedStops.size(); i++) {
+            demand.add(new Demand(affectedStops.get(i), base + (i < remainder ? 1 : 0), i));
+        }
+        demand.removeIf(group -> group.passengers() == 0);
+        demand.sort(Comparator
+                .comparingInt((Demand group) -> (int) availableBuses.stream()
+                        .filter(bus -> remainingSeats.getOrDefault(bus.registrationNumber, 0) >= group.passengers())
+                        .count())
+                .thenComparing(Demand::passengers, Comparator.reverseOrder())
+                .thenComparingInt(Demand::routeOrder));
+
+        List<StopAssignment> assignments = new ArrayList<>();
+        Map<String, Integer> unassignedByStop = new HashMap<>();
+        int unassigned = 0;
+        double addedDistance = 0;
+        int addedMinutes = 0;
+
+        for (Demand group : demand) {
+            List<Bus> feasible = availableBuses.stream()
+                    .filter(bus -> remainingSeats.getOrDefault(bus.registrationNumber, 0) >= group.passengers())
+                    .sorted(Comparator
+                            .comparingDouble((Bus bus) -> nearestRoutePointKm(bus, group.stop()))
+                            .thenComparing(bus -> bus.registrationNumber))
+                    .toList();
+            if (feasible.isEmpty()) {
+                unassigned += group.passengers();
+                unassignedByStop.put(group.stop().name, group.passengers());
+                continue;
             }
+
+            Bus rescueBus = feasible.getFirst();
+            int spareBefore = remainingSeats.get(rescueBus.registrationNumber);
+            remainingSeats.put(rescueBus.registrationNumber, spareBefore - group.passengers());
+            Stop origin = nearestRoutePoint(rescueBus, group.stop());
+            OsmRoutingClient.RouteEstimate estimate = osmRouting.estimate(
+                    origin.latitude, origin.longitude, group.stop().latitude, group.stop().longitude);
+            double roundTripKm = estimate.distanceKm() * 2;
+            int roundTripMinutes = estimate.durationMinutes() * 2;
+            assignments.add(new StopAssignment(
+                    group.stop().id.toString(), group.stop().name,
+                    rescueBus.registrationNumber,
+                    rescueBus.route.name,
+                    rescueBus.driverName, rescueBus.driverPhone,
+                    group.stop().latitude, group.stop().longitude,
+                    group.passengers(), spareBefore, roundTripKm, roundTripMinutes,
+                    estimate.source()));
+            addedDistance += roundTripKm;
+            addedMinutes = Math.max(addedMinutes, roundTripMinutes);
         }
 
-        if (bestBus != null && bestBus.route != null) {
-            combinedStops.addAll(stopRepository.findByRouteIdOrderByStopOrderAsc(bestBus.route.id));
-        }
+        assignments.sort(Comparator.comparingInt(item -> {
+            for (int i = 0; i < affectedStops.size(); i++) {
+                if (affectedStops.get(i).id.toString().equals(item.stopId())) return i;
+            }
+            return Integer.MAX_VALUE;
+        }));
 
-        // Calculate detour metrics
-        double addedDist = Math.round(minScore * 1.4 * 10.0) / 10.0;
-        int addedMins = (int) Math.max(3, Math.round(addedDist * 2.2));
-
+        int covered = assignments.stream().mapToInt(StopAssignment::studentCount).sum();
+        int stopsCovered = (int) assignments.stream().map(StopAssignment::stopId).distinct().count();
         String explanation = String.format(
-            "Auto-assigned %s (Driver: %s) via U-turn diversion. 100%% of remaining stops (%d stops) visited at least once (+%.1f km detour).",
-            bestBus != null ? bestBus.registrationNumber : "Nearby Bus",
-            bestBus != null ? bestBus.driverName : "Standby Driver",
-            leftoverCount > 0 ? leftoverCount : 3,
-            addedDist
-        );
+                "Java dispatch assigned %d of %d passengers to %d rescue buses across %d of %d pickup groups; %d passengers need manual support. Detour values use %s.",
+                covered, strandedStudents,
+                assignments.stream().map(StopAssignment::assignedBusNumber).distinct().count(),
+                stopsCovered, affectedStops.size(), unassigned,
+                assignments.stream().anyMatch(a -> a.estimateSource().equals("OSRM_OPENSTREETMAP"))
+                        ? "OpenStreetMap-based OSRM road estimates"
+                        : "straight-line simulation estimates");
 
-        return new OptimalRerouteResult(bestBus, combinedStops, addedDist, addedMins, explanation, leftoverCount > 0 ? leftoverCount : 3, true);
+        return new OptimalRerouteResult(
+                List.copyOf(assignments), Map.copyOf(unassignedByStop), unassigned,
+                strandedStudents, affectedStops.size(), stopsCovered,
+                addedDistance, addedMinutes, stopsCovered == affectedStops.size(), explanation);
     }
 
-    private double distanceKm(double lat1, double lon1, double lat2, double lon2) {
+    private Stop nearestRoutePoint(Bus bus, Stop target) {
+        return stopRepository.findByRouteIdOrderByStopOrderAsc(bus.route.id).stream()
+                .min(Comparator.comparingDouble(stop -> haversineKm(
+                        stop.latitude, stop.longitude, target.latitude, target.longitude)))
+                .orElse(target);
+    }
+
+    private double nearestRoutePointKm(Bus bus, Stop target) {
+        Stop nearest = nearestRoutePoint(bus, target);
+        return haversineKm(nearest.latitude, nearest.longitude, target.latitude, target.longitude);
+    }
+
+    private static boolean isCampus(String name) {
+        String normalized = name.toLowerCase();
+        return normalized.contains("campus gate") || normalized.contains("klh aziz nagar campus");
+    }
+
+    private static double haversineKm(double lat1, double lon1, double lat2, double lon2) {
         double dLat = Math.toRadians(lat2 - lat1);
         double dLon = Math.toRadians(lon2 - lon1);
         double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
                 + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
                 * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        return 6371 * c; // Earth radius in KM
+        return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     }
+
+    private record Demand(Stop stop, int passengers, int routeOrder) {}
 }

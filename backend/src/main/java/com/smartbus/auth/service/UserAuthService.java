@@ -14,6 +14,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class UserAuthService {
+    private static final String LEGACY_SEED_PASSWORD_HASH =
+            "$2a$10$e8eM24zIeGzCj/dY2i0W7ep0o48o/FkGj0Z2kYgE7G2sC3hC3a42C";
     private final AppUserRepository users; private final PasswordEncoder encoder; private final JwtService jwt;
     @Value("${smartbus.bootstrap-manager-username}") private String bootstrapUsername;
     @Value("${smartbus.bootstrap-manager-password}") private String bootstrapPassword;
@@ -28,30 +30,32 @@ public class UserAuthService {
 
     public UserAuthService(AppUserRepository users, PasswordEncoder encoder, JwtService jwt) { this.users=users; this.encoder=encoder; this.jwt=jwt; }
     @PostConstruct void bootstrapManager() {
-        if (users.findByUsernameIgnoreCase(bootstrapUsername).isEmpty()) {
-            AppUser user = new AppUser(); user.id=UUID.randomUUID(); user.username=bootstrapUsername;
-            user.passwordHash=encoder.encode(bootstrapPassword); user.displayName="Application Manager";
-            user.role="APP_MANAGER"; user.active=true; user.createdAt=Instant.now(); users.save(user);
-        }
-        if (users.findByUsernameIgnoreCase(hodUsername).isEmpty()) {
-            AppUser user = new AppUser(); user.id=UUID.randomUUID(); user.username=hodUsername;
-            user.passwordHash=encoder.encode(hodPassword); user.displayName="Head of Department";
-            user.role="HOD"; user.active=true; user.createdAt=Instant.now(); users.save(user);
-        }
-        if (users.findByUsernameIgnoreCase(adminUsername).isEmpty()) {
-            AppUser user = new AppUser(); user.id=UUID.randomUUID(); user.username=adminUsername;
-            user.passwordHash=encoder.encode(adminPassword); user.displayName="Transport Administrator";
-            user.role="ADMIN"; user.active=true; user.createdAt=Instant.now(); users.save(user);
-        }
-        if (users.findByUsernameIgnoreCase(inchargeUsername).isEmpty()) {
-            AppUser user = new AppUser(); user.id=UUID.randomUUID(); user.username=inchargeUsername;
-            user.passwordHash=encoder.encode(inchargePassword); user.displayName="Meera Singh (Incharge)";
-            user.role="INCHARGE"; user.active=true; user.createdAt=Instant.now(); users.save(user);
-        }
-        if (users.findByUsernameIgnoreCase(studentUsername).isEmpty()) {
-            AppUser user = new AppUser(); user.id=UUID.randomUUID(); user.username=studentUsername;
-            user.passwordHash=encoder.encode(studentPassword); user.displayName="Aarav Sharma (Student)";
-            user.role="STUDENT"; user.active=true; user.createdAt=Instant.now(); users.save(user);
+        ensureBootstrapUser(bootstrapUsername, bootstrapPassword, "Application Manager", "APP_MANAGER");
+        ensureBootstrapUser(hodUsername, hodPassword, "Head of Department", "HOD");
+        ensureBootstrapUser(adminUsername, adminPassword, "Transport Administrator", "ADMIN");
+        ensureBootstrapUser(inchargeUsername, inchargePassword, "Meera Singh (Incharge)", "INCHARGE");
+        ensureBootstrapUser(studentUsername, studentPassword, "Aarav Sharma (Student)", "STUDENT");
+    }
+
+    private void ensureBootstrapUser(String username, String password, String displayName, String role) {
+        AppUser user = users.findByUsernameIgnoreCase(username).orElse(null);
+        if (user == null) {
+            user = new AppUser();
+            user.id = UUID.randomUUID();
+            user.username = username;
+            user.passwordHash = encoder.encode(password);
+            user.displayName = displayName;
+            user.role = role;
+            user.active = true;
+            user.createdAt = Instant.now();
+            users.save(user);
+        } else if (LEGACY_SEED_PASSWORD_HASH.equals(user.passwordHash)) {
+            // V10 used a placeholder BCrypt value that never matched the documented
+            // demo passwords. Repair only this known placeholder; leave real/custom
+            // passwords untouched on every subsequent startup.
+            user.passwordHash = encoder.encode(password);
+            user.active = true;
+            users.save(user);
         }
     }
     public Map<String,String> login(String username, String password, String requiredRole) {

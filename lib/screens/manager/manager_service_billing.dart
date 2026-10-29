@@ -7,10 +7,10 @@ class ManagerServiceBilling extends StatelessWidget {
 
   final List<Map<String, dynamic>> _mockServices = const [
     {
-      'service': 'Google Maps API',
-      'cost': 45.20,
-      'calls': 12500,
-      'status': 'active'
+      'service': 'OpenStreetMap / OSRM',
+      'cost': 0.00,
+      'calls': 0,
+      'status': 'configured'
     },
     {
       'service': 'PostgreSQL Database',

@@ -15,9 +15,9 @@ class _ManagerConfigsState extends State<ManagerConfigs>
 
   final List<Map<String, String>> _apiKeys = [
     {
-      'key': 'google_maps_api_key',
-      'value': 'AIzaSy_DEFAULT_KEY',
-      'desc': 'API key for Google Maps'
+      'key': 'osrm_base_url',
+      'value': 'https://router.project-osrm.org',
+      'desc': 'OSRM-compatible routing service base URL'
     },
     {
       'key': 'stripe_secret_key',
