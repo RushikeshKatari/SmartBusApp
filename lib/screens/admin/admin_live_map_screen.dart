@@ -23,49 +23,700 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
   LiveRouteStop? _selectedStop;
   bool _isBreakdownTabSelected = false;
   int _simulatedStrandedPassengers = 15;
+  Set<String> _selectedBreakdownBusNumbers = {};
+  bool _isSimulatingBreakdown = false;
   Map<String, List<geo.LatLng>> _roadPaths = const {};
-  final DateTime _simulationStartedAt = DateTime.now();
+  bool _fleetSimulationRunning = false;
+  bool _fleetSimulationStarted = false;
+  double _minimumSpeedKmh = 60;
+  double _maximumSpeedKmh = 100;
+  DateTime? _lastFleetTickAt;
+  final Map<String, double> _busDistanceKm = {};
+  final Map<String, double> _busRouteLengthsKm = {};
+  final Map<String, double> _busSpeedsKmh = {};
+  final math.Random _simulationRandom = math.Random();
   Timer? _busTicker;
+  Timer? _breakdownBlinkTimer;
+  bool _rescueGlowOn = true;
+  String? _visualizedBreakdownId;
+  final Map<String, Color> _rescueRouteColors = {};
+  final Map<String, List<geo.LatLng>> _emergencyRoadPaths = {};
+  final Set<String> _emergencyRoadPathUnavailable = {};
+  String? _roadPathRequestSignature;
+  bool _roadPathsReady = false;
 
   @override
   void initState() {
     super.initState();
-    _loadRoadPaths();
     _busTicker = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) setState(() {});
+      if (!mounted || !_fleetSimulationRunning) return;
+      final now = DateTime.now();
+      final previous = _lastFleetTickAt ?? now;
+      final elapsedSeconds = now.difference(previous).inMilliseconds / 1000;
+      for (final entry in _busSpeedsKmh.entries) {
+        final advancedDistance = (_busDistanceKm[entry.key] ?? 0) +
+            entry.value * elapsedSeconds / 3600;
+        final routeLength = _busRouteLengthsKm[entry.key];
+        _busDistanceKm[entry.key] = routeLength == null
+            ? advancedDistance
+            : advancedDistance.clamp(0.0, routeLength);
+      }
+      _lastFleetTickAt = now;
+      setState(() {});
     });
   }
 
-  Future<void> _loadRoadPaths() async {
-    final paths = await RoutePathApiService.fetchRoadPaths();
-    if (mounted && paths.isNotEmpty) setState(() => _roadPaths = paths);
+  void _toggleFleetSimulation(List<LiveBusRoute> routes) {
+    setState(() {
+      if (_fleetSimulationRunning) {
+        _lastFleetTickAt = null;
+        _fleetSimulationRunning = false;
+        return;
+      }
+
+      _randomizeBusSpeeds(routes);
+      _busRouteLengthsKm
+        ..clear()
+        ..addEntries(routes.map((route) => MapEntry(
+              route.busNumber,
+              _routeDistanceKm(_mapPathFor(route)),
+            )));
+      if (!_fleetSimulationStarted) _busDistanceKm.clear();
+      _fleetSimulationStarted = true;
+      _lastFleetTickAt = DateTime.now();
+      _fleetSimulationRunning = true;
+    });
+  }
+
+  void _randomizeBusSpeeds(List<LiveBusRoute> routes) {
+    _busSpeedsKmh
+      ..clear()
+      ..addEntries(routes.map((route) => MapEntry(
+            route.busNumber,
+            _minimumSpeedKmh +
+                _simulationRandom.nextDouble() *
+                    (_maximumSpeedKmh - _minimumSpeedKmh),
+          )));
+  }
+
+  void _startBreakdownBlink(
+    BreakdownRerouteEvent breakdown,
+    List<LiveBusRoute> routes,
+  ) {
+    _breakdownBlinkTimer?.cancel();
+    const palette = [
+      Color(0xFFEF4444),
+      Color(0xFF3B82F6),
+      Color(0xFF22C55E),
+      Color(0xFFFACC15),
+    ];
+    final shuffledPalette = [...palette]..shuffle(_simulationRandom);
+    _rescueRouteColors
+      ..clear()
+      ..addEntries([
+        for (var index = 0; index < breakdown.rescueBusNumbers.length; index++)
+          MapEntry(
+            breakdown.rescueBusNumbers[index],
+            shuffledPalette[index % shuffledPalette.length],
+          ),
+      ]);
+    _emergencyRoadPaths.clear();
+    _emergencyRoadPathUnavailable.clear();
+    _rescueGlowOn = true;
+    _busRouteLengthsKm
+      ..clear()
+      ..addEntries(routes.map((route) => MapEntry(
+            route.busNumber,
+            _routeDistanceKm(_mapPathFor(route)),
+          )));
+    for (final rescueBusNumber in breakdown.rescueBusNumbers) {
+      _busDistanceKm[rescueBusNumber] = 0;
+    }
+    _breakdownBlinkTimer = Timer.periodic(
+      const Duration(milliseconds: 900),
+      (_) {
+        if (mounted) setState(() => _rescueGlowOn = !_rescueGlowOn);
+      },
+    );
+    setState(() {});
+  }
+
+  void _stopBreakdownBlink() {
+    _breakdownBlinkTimer?.cancel();
+    _breakdownBlinkTimer = null;
+    _rescueRouteColors.clear();
+    _emergencyRoadPaths.clear();
+    _emergencyRoadPathUnavailable.clear();
+    _rescueGlowOn = true;
+    _visualizedBreakdownId = null;
+  }
+
+  Future<List<String>?> _chooseBreakdownBuses(
+    List<LiveBusRoute> routes,
+    Set<String> alreadyBroken,
+  ) =>
+      showDialog<List<String>>(
+        context: context,
+        builder: (dialogContext) {
+          final eligible = routes
+              .where((route) => !alreadyBroken.contains(route.busNumber))
+              .toList();
+          final selected = <String>{
+            ..._selectedBreakdownBusNumbers.where(
+              (number) => eligible.any((route) => route.busNumber == number),
+            ),
+          };
+          return StatefulBuilder(
+            builder: (context, setDialogState) => AlertDialog(
+              title: const Text('Select buses to break down'),
+              content: SizedBox(
+                width: 420,
+                height: 360,
+                child: eligible.isEmpty
+                    ? const Center(child: Text('No active buses available.'))
+                    : ListView.builder(
+                        itemCount: eligible.length,
+                        itemBuilder: (context, index) {
+                          final route = eligible[index];
+                          return CheckboxListTile(
+                            value: selected.contains(route.busNumber),
+                            title:
+                                Text('${route.busNumber} · ${route.busName}'),
+                            subtitle: Text(route.driverName),
+                            dense: true,
+                            onChanged: (checked) => setDialogState(() {
+                              if (checked == true) {
+                                selected.add(route.busNumber);
+                              } else {
+                                selected.remove(route.busNumber);
+                              }
+                            }),
+                          );
+                        },
+                      ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: selected.isEmpty
+                      ? null
+                      : () => Navigator.pop(dialogContext, selected.toList()),
+                  child: Text('Use ${selected.length} buses'),
+                ),
+              ],
+            ),
+          );
+        },
+      );
+
+  Future<void> _simulateBreakdowns(
+    SmartBusProvider provider,
+    List<LiveBusRoute> routes,
+    Set<String> alreadyBroken,
+  ) async {
+    final selected = await _chooseBreakdownBuses(routes, alreadyBroken);
+    if (!mounted || selected == null || selected.isEmpty) return;
+    setState(() => _isSimulatingBreakdown = true);
+    var completed = 0;
+    for (final busNumber in selected) {
+      final route = routes.firstWhere(
+        (item) => item.busNumber == busNumber,
+        orElse: () => routes.first,
+      );
+      final stop = route.stops.length > 1 ? route.stops[1] : route.stops.first;
+      final success = await provider.triggerAutomatedBreakdownReroute(
+        busNumber: route.busNumber,
+        busName: route.busName,
+        inchargeName: route.driverName,
+        reason: 'Engine Breakdown',
+        location: stop.landmark,
+        strandedStudentsCount: _simulatedStrandedPassengers,
+      );
+      if (!success) break;
+      completed++;
+    }
+    if (!mounted) return;
+    setState(() {
+      _isSimulatingBreakdown = false;
+      _isBreakdownTabSelected = true;
+      _selectedRoute = null;
+      _selectedStop = null;
+      _selectedBreakdownBusNumbers = {};
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          completed == selected.length
+              ? '🚨 Java dispatch created for $completed bus breakdown${completed == 1 ? '' : 's'}.'
+              : 'Dispatch created for $completed of ${selected.length} buses. Check backend connectivity or capacity.',
+        ),
+        backgroundColor: completed == selected.length
+            ? AppColors.success
+            : AppColors.warning,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  Widget _buildRescueAssignmentSummary(
+    LiveBusRoute route,
+    BreakdownRerouteEvent breakdown,
+  ) {
+    final regularStopCount =
+        route.stops.where((stop) => !stop.isDivertedPickup).length;
+    final passengerCount = breakdown.stopAssignments
+        .where((assignment) => assignment.assignedBusNumber == route.busNumber)
+        .fold<int>(0, (total, assignment) => total + assignment.studentCount);
+    final rationale = breakdown.stopAssignments
+        .where((assignment) => assignment.assignedBusNumber == route.busNumber)
+        .map((assignment) => assignment.assignmentReason)
+        .where((reason) => reason.isNotEmpty)
+        .toSet()
+        .join(' ');
+    final emergencyStops = route.stops
+        .where((stop) => stop.isDivertedPickup)
+        .map((stop) => stop.isBreakdownPickup ? 'Breakdown pickup' : stop.name)
+        .toList();
+    final color = _rescueRouteColors[route.busNumber] ?? route.color;
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 9,
+            height: 9,
+            margin: const EdgeInsets.only(top: 3),
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+              boxShadow: [BoxShadow(color: color, blurRadius: 7)],
+            ),
+          ),
+          const SizedBox(width: 7),
+          Expanded(
+            child: Text(
+              '${route.busNumber} · ${route.driverName} · $passengerCount passengers · $regularStopCount original stops kept\n${emergencyStops.isEmpty ? "No emergency stops" : emergencyStops.join(" → ")}${rationale.isEmpty ? "" : "\nWhy this bus: $rationale"}',
+              style: const TextStyle(color: Colors.white70, fontSize: 10),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatSpeed(double speed) => speed == speed.roundToDouble()
+      ? speed.round().toString()
+      : speed.toStringAsFixed(1);
+
+  Future<void> _editSimulationSpeedRange(List<LiveBusRoute> routes) async {
+    final minimumController = TextEditingController(
+      text: _formatSpeed(_minimumSpeedKmh),
+    );
+    final maximumController = TextEditingController(
+      text: _formatSpeed(_maximumSpeedKmh),
+    );
+    final updatedRange = await showDialog<(double, double)>(
+      context: context,
+      builder: (dialogContext) {
+        String? validationError;
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) => AlertDialog(
+            title: const Text('Simulation speed range'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('Each bus gets a random speed in this range.'),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: minimumController,
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
+                        decoration: const InputDecoration(
+                          labelText: 'Minimum',
+                          suffixText: 'km/h',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextField(
+                        controller: maximumController,
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
+                        decoration: const InputDecoration(
+                          labelText: 'Maximum',
+                          suffixText: 'km/h',
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                if (validationError != null) ...[
+                  const SizedBox(height: 10),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      validationError!,
+                      style: TextStyle(
+                        color: Theme.of(dialogContext).colorScheme.error,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  final minimum =
+                      double.tryParse(minimumController.text.trim());
+                  final maximum =
+                      double.tryParse(maximumController.text.trim());
+                  final validSpeeds = minimum != null &&
+                      maximum != null &&
+                      minimum.isFinite &&
+                      maximum.isFinite &&
+                      minimum >= 1 &&
+                      maximum <= 200 &&
+                      maximum >= minimum;
+                  if (!validSpeeds) {
+                    setDialogState(() {
+                      validationError =
+                          'Use speeds from 1 to 200 km/h, with maximum at least minimum.';
+                    });
+                    return;
+                  }
+                  Navigator.of(dialogContext).pop((minimum, maximum));
+                },
+                child: const Text('Apply'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    minimumController.dispose();
+    maximumController.dispose();
+    if (!mounted || updatedRange == null) return;
+    setState(() {
+      _minimumSpeedKmh = updatedRange.$1;
+      _maximumSpeedKmh = updatedRange.$2;
+      if (_fleetSimulationRunning) _randomizeBusSpeeds(routes);
+    });
+  }
+
+  String _pathSignature(List<LiveBusRoute> routes) => routes
+      .map((route) =>
+          '${route.busNumber}:${route.hasCustomPath}:${route.stops.where((stop) => !stop.isDivertedPickup).map((stop) => '${stop.latitude.toStringAsFixed(6)},${stop.longitude.toStringAsFixed(6)}').join(';')}')
+      .join('|');
+
+  Future<void> _loadRoadPaths(
+    List<LiveBusRoute> routes,
+    String signature,
+  ) async {
+    final serverPaths = await RoutePathApiService.fetchRoadPaths();
+    final entries = await Future.wait(routes.map((route) async {
+      final orderedStops = route.stops
+          .where((stop) => !stop.isDivertedPickup)
+          .toList(growable: false);
+      if (orderedStops.length < 2) {
+        return MapEntry(route.busNumber, const <geo.LatLng>[]);
+      }
+      final expected = orderedStops
+          .map((stop) => geo.LatLng(stop.latitude, stop.longitude))
+          .toList(growable: false);
+      var path = serverPaths[route.busNumber] ?? const <geo.LatLng>[];
+      var pathMatchesRoute = path.length > 1 &&
+          _endpointErrorKm(path, expected, reverse: false) <= 0.5;
+      if (path.length > 1) {
+        final reverseError = _endpointErrorKm(path, expected, reverse: true);
+        if (reverseError < _endpointErrorKm(path, expected, reverse: false)) {
+          path = path.reversed.toList(growable: false);
+          pathMatchesRoute = reverseError <= 0.5;
+        }
+      }
+      if (route.hasCustomPath || !pathMatchesRoute) {
+        final routed = await RoutePathApiService.fetchOrderedRoadPath(expected);
+        if (routed != null && routed.followsRoads && routed.points.length > 1) {
+          path = routed.points;
+        } else if (!pathMatchesRoute || route.hasCustomPath) {
+          path = expected;
+        }
+      }
+      return MapEntry(route.busNumber, path);
+    }));
+    if (!mounted || _roadPathRequestSignature != signature) return;
+    final paths = Map<String, List<geo.LatLng>>.fromEntries(entries);
+    setState(() {
+      _roadPaths = paths;
+      _roadPathsReady = true;
+      _busRouteLengthsKm
+        ..clear()
+        ..addEntries(routes.map((route) => MapEntry(
+              route.busNumber,
+              _routeDistanceKm(_mapPathFor(route)),
+            )));
+      for (final route in routes) {
+        final length = _busRouteLengthsKm[route.busNumber] ?? 0;
+        _busDistanceKm[route.busNumber] =
+            (_busDistanceKm[route.busNumber] ?? 0).clamp(0.0, length);
+      }
+    });
+  }
+
+  double _endpointErrorKm(
+    List<geo.LatLng> path,
+    List<geo.LatLng> orderedStops, {
+    required bool reverse,
+  }) {
+    final start = reverse ? path.last : path.first;
+    final end = reverse ? path.first : path.last;
+    return _segmentDistanceKm(start, orderedStops.first) +
+        _segmentDistanceKm(end, orderedStops.last);
   }
 
   @override
   void dispose() {
     _busTicker?.cancel();
+    _breakdownBlinkTimer?.cancel();
     super.dispose();
   }
 
   List<geo.LatLng> _pathFor(LiveBusRoute route) =>
       _roadPaths[route.busNumber] ??
       route.stops
+          .where((stop) => !stop.isDivertedPickup)
           .map((stop) => geo.LatLng(stop.latitude, stop.longitude))
           .toList();
 
-  geo.LatLng _positionOnRoute(List<geo.LatLng> points, double phaseOffset) {
-    final elapsed =
-        DateTime.now().difference(_simulationStartedAt).inMilliseconds / 90000;
-    final progress = (elapsed + phaseOffset) % 1;
-    final position = progress * (points.length - 1);
-    final index = position.floor();
-    final fraction = position - index;
-    final start = points[index];
-    final end = points[(index + 1).clamp(0, points.length - 1)];
-    return geo.LatLng(
-      start.latitude + (end.latitude - start.latitude) * fraction,
-      start.longitude + (end.longitude - start.longitude) * fraction,
-    );
+  List<geo.LatLng> _mapPathFor(LiveBusRoute route) {
+    final path = _pathFor(route);
+    if (path.length < 2) return path;
+    final emergencyStops =
+        route.stops.where((item) => item.isDivertedPickup).toList();
+    if (emergencyStops.isEmpty) return path;
+    // Do not draw an invented straight-line rescue path while street routing
+    // is pending or unavailable.
+    return _emergencyRoadPaths[route.busNumber] ?? const <geo.LatLng>[];
+  }
+
+  Future<void> _loadEmergencyRoadPaths(
+    BreakdownRerouteEvent breakdown,
+    List<LiveBusRoute> routes,
+  ) async {
+    final rescueNumbers = breakdown.rescueBusNumbers.toSet();
+    final rescueRoutes = routes.where((route) =>
+        rescueNumbers.contains(route.busNumber) &&
+        route.stops.any((stop) => stop.isDivertedPickup));
+    final unavailableBuses = <String>[];
+    for (final route in rescueRoutes) {
+      final regularStops = route.stops
+          .where((stop) => !stop.isDivertedPickup)
+          .toList()
+        ..sort((a, b) => a.order.compareTo(b.order));
+      final emergencyStops = route.stops
+          .where((stop) => stop.isDivertedPickup)
+          .toList()
+        ..sort((a, b) => a.order.compareTo(b.order));
+      if (regularStops.length < 2 || emergencyStops.isEmpty) continue;
+
+      final start = geo.LatLng(
+        regularStops.first.latitude,
+        regularStops.first.longitude,
+      );
+      final waypoints = <geo.LatLng>[
+        start,
+        ...emergencyStops.map(
+          (stop) => geo.LatLng(stop.latitude, stop.longitude),
+        ),
+        start,
+        ...regularStops.skip(1).map(
+              (stop) => geo.LatLng(stop.latitude, stop.longitude),
+            ),
+      ];
+      final result = await RoutePathApiService.fetchOrderedRoadPath(waypoints);
+      if (!mounted || _visualizedBreakdownId != breakdown.id) return;
+      if (result != null && result.followsRoads && result.points.length > 1) {
+        _emergencyRoadPaths[route.busNumber] = result.points;
+        _emergencyRoadPathUnavailable.remove(route.busNumber);
+      } else {
+        _emergencyRoadPathUnavailable.add(route.busNumber);
+        unavailableBuses.add(route.busNumber);
+      }
+      _busRouteLengthsKm[route.busNumber] =
+          _routeDistanceKm(_mapPathFor(route));
+      setState(() {});
+    }
+    if (mounted &&
+        _visualizedBreakdownId == breakdown.id &&
+        unavailableBuses.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Road routing unavailable for ${unavailableBuses.join(', ')}. Rescue route lines are hidden instead of shown as straight shortcuts.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  List<osm.Marker> _directionArrowMarkers(
+    LiveBusRoute route,
+    List<geo.LatLng> path,
+  ) {
+    if (path.length < 2) return const [];
+    final segmentLengths = <double>[];
+    var totalDistance = 0.0;
+    for (var index = 0; index < path.length - 1; index++) {
+      final length = _segmentDistanceKm(path[index], path[index + 1]);
+      segmentLengths.add(length);
+      totalDistance += length;
+    }
+    if (totalDistance < 0.3) return const [];
+
+    final color = _rescueRouteColors[route.busNumber] ?? route.color;
+    final arrowCount = (totalDistance / 1.2).ceil().clamp(3, 36);
+    return List.generate(arrowCount, (arrowIndex) {
+      final fraction = (arrowIndex + 1) / (arrowCount + 1);
+      final targetDistance = totalDistance * fraction;
+      var traversed = 0.0;
+      var point = path.first;
+      var angle = 0.0;
+      for (var index = 0; index < segmentLengths.length; index++) {
+        final segmentLength = segmentLengths[index];
+        if (targetDistance <= traversed + segmentLength ||
+            index == segmentLengths.length - 1) {
+          final start = path[index];
+          final end = path[index + 1];
+          final segmentFraction = segmentLength == 0
+              ? 0.0
+              : ((targetDistance - traversed) / segmentLength).clamp(0.0, 1.0);
+          point = geo.LatLng(
+            start.latitude + (end.latitude - start.latitude) * segmentFraction,
+            start.longitude +
+                (end.longitude - start.longitude) * segmentFraction,
+          );
+          final latitudeScale = math.cos(
+            ((start.latitude + end.latitude) / 2) * math.pi / 180,
+          );
+          angle = math.atan2(
+            (end.longitude - start.longitude) * latitudeScale,
+            end.latitude - start.latitude,
+          );
+          break;
+        }
+        traversed += segmentLength;
+      }
+      return osm.Marker(
+        point: point,
+        width: 20,
+        height: 20,
+        child: Tooltip(
+          message: 'Rescue direction · ${route.busNumber}',
+          child: Container(
+            decoration: BoxDecoration(
+              color: const Color(0xE6111827),
+              shape: BoxShape.circle,
+              border:
+                  Border.all(color: color.withValues(alpha: 0.85), width: 1.5),
+            ),
+            alignment: Alignment.center,
+            child: Transform.rotate(
+              angle: angle,
+              child: Icon(Icons.arrow_upward_rounded, size: 13, color: color),
+            ),
+          ),
+        ),
+      );
+    }).toList(growable: false);
+  }
+
+  void _focusRoute(LiveBusRoute? route, List<LiveBusRoute> allRoutes) {
+    final focusedRoutes = route == null ? allRoutes : [route];
+    final points = focusedRoutes.expand(_mapPathFor).toList();
+    if (points.length < 2) return;
+    _mapController.fitCamera(osm.CameraFit.bounds(
+      bounds: osm.LatLngBounds.fromPoints(points),
+      padding: const EdgeInsets.all(96),
+    ));
+  }
+
+  geo.LatLng _positionOnRoute(List<geo.LatLng> points, String busNumber) {
+    if (points.length < 2) return points.first;
+    final distanceTraveled = _busDistanceKm[busNumber] ?? 0;
+    var totalDistanceKm = 0.0;
+    final segmentLengths = <double>[];
+    for (var i = 0; i < points.length - 1; i++) {
+      final segmentLength = _segmentDistanceKm(points[i], points[i + 1]);
+      segmentLengths.add(segmentLength);
+      totalDistanceKm += segmentLength;
+    }
+    if (totalDistanceKm == 0) return points.first;
+
+    // Buses travel from the route's starting stop to campus, then stay parked.
+    final distanceAlong = distanceTraveled.clamp(0.0, totalDistanceKm);
+    var traversed = 0.0;
+    for (var i = 0; i < segmentLengths.length; i++) {
+      final segmentLength = segmentLengths[i];
+      if (distanceAlong <= traversed + segmentLength ||
+          i == segmentLengths.length - 1) {
+        final fraction = segmentLength == 0
+            ? 0.0
+            : ((distanceAlong - traversed) / segmentLength).clamp(0.0, 1.0);
+        final start = points[i];
+        final end = points[i + 1];
+        return geo.LatLng(
+          start.latitude + (end.latitude - start.latitude) * fraction,
+          start.longitude + (end.longitude - start.longitude) * fraction,
+        );
+      }
+      traversed += segmentLength;
+    }
+    return points.last;
+  }
+
+  double _routeDistanceKm(List<geo.LatLng> points) {
+    var distance = 0.0;
+    for (var index = 0; index < points.length - 1; index++) {
+      distance += _segmentDistanceKm(points[index], points[index + 1]);
+    }
+    return distance;
+  }
+
+  String _busTooltip(LiveBusRoute route) {
+    final path = _mapPathFor(route);
+    if (_fleetSimulationStarted &&
+        path.length > 1 &&
+        (_busDistanceKm[route.busNumber] ?? 0) >= _routeDistanceKm(path)) {
+      return '${route.busNumber} · Arrived at KLH campus parking · Parked';
+    }
+    if (_fleetSimulationStarted) {
+      return '${route.busNumber} · ${(_busSpeedsKmh[route.busNumber] ?? 0).round()} km/h · traveling to campus';
+    }
+    return '${route.busNumber} · waiting for simulation';
+  }
+
+  double _segmentDistanceKm(geo.LatLng start, geo.LatLng end) {
+    final latitudeDelta = (end.latitude - start.latitude) * 111.32;
+    final longitudeDelta = (end.longitude - start.longitude) *
+        111.32 *
+        math.cos(start.latitude * math.pi / 180);
+    return math
+        .sqrt(latitudeDelta * latitudeDelta + longitudeDelta * longitudeDelta);
   }
 
   geo.LatLng _snapToRoute(geo.LatLng point, List<geo.LatLng> path) {
@@ -298,7 +949,35 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
   Widget build(BuildContext context) {
     final provider = context.watch<SmartBusProvider>();
     final routes = provider.liveRoutes;
+    final pathSignature = _pathSignature(routes);
+    if (pathSignature != _roadPathRequestSignature) {
+      _roadPathRequestSignature = pathSignature;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) unawaited(_loadRoadPaths(routes, pathSignature));
+      });
+    }
     final breakdown = provider.activeBreakdown;
+    final rescueBusNumbers = breakdown?.rescueBusNumbers.toSet() ?? <String>{};
+    final brokenBusNumbers = breakdown?.brokenBusNumbers.toSet() ?? <String>{};
+    final emphasizedBusNumbers = {
+      ...brokenBusNumbers,
+      ...rescueBusNumbers,
+    };
+    final visibleRoutes = _selectedRoute == null
+        ? routes
+        : routes.where((route) => route.id == _selectedRoute!.id).toList();
+    if (breakdown?.id != _visualizedBreakdownId) {
+      _visualizedBreakdownId = breakdown?.id;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        if (breakdown == null) {
+          _stopBreakdownBlink();
+        } else {
+          _startBreakdownBlink(breakdown, routes);
+          unawaited(_loadEmergencyRoadPaths(breakdown, routes));
+        }
+      });
+    }
 
     return Scaffold(
       backgroundColor: const Color(0xFF0B1120),
@@ -340,11 +1019,11 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
                             ),
                           ),
                           const SizedBox(width: 12),
-                          const Expanded(
+                          Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
+                                const Text(
                                   'Fleet Dispatch Simulator',
                                   style: TextStyle(
                                     color: Colors.white,
@@ -353,7 +1032,7 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
                                   ),
                                 ),
                                 Text(
-                                  '20 Hyderabad routes • Simulated dispatch',
+                                  '${routes.length} Hyderabad routes • Simulated dispatch',
                                   style: TextStyle(
                                     color: Colors.white60,
                                     fontSize: 11,
@@ -398,10 +1077,33 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
                         ],
                       ),
                       const SizedBox(height: 14),
-
                       if (breakdown == null) ...[
+                        OutlinedButton.icon(
+                          onPressed: _isSimulatingBreakdown
+                              ? null
+                              : () async {
+                                  final selected = await _chooseBreakdownBuses(
+                                    routes,
+                                    brokenBusNumbers,
+                                  );
+                                  if (selected != null && mounted) {
+                                    setState(() =>
+                                        _selectedBreakdownBusNumbers =
+                                            selected.toSet());
+                                  }
+                                },
+                          icon: const Icon(Icons.library_add_check_rounded),
+                          label: Text(
+                            'Select buses (${_selectedBreakdownBusNumbers.length})',
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.white,
+                            minimumSize: const Size(double.infinity, 44),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
                         Text(
-                          'Demo scenario: $_simulatedStrandedPassengers stranded passengers',
+                          'Estimated passengers per bus: $_simulatedStrandedPassengers',
                           style: const TextStyle(
                             color: Colors.white70,
                             fontSize: 11,
@@ -419,52 +1121,25 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
                           }),
                         ),
                       ],
-
-                      // Simulation Breakdown Trigger Button
                       if (breakdown == null)
                         SizedBox(
                           width: double.infinity,
                           child: FilledButton.icon(
-                            onPressed: () async {
-                              final applied = await provider
-                                  .triggerAutomatedBreakdownReroute(
-                                busNumber: 'SB-04',
-                                busName: 'Campus Express',
-                                inchargeName: 'Meera Singh',
-                                reason: 'Engine Breakdown',
-                                location: 'Aziz Nagar / TSPA Junction',
-                                strandedStudentsCount:
-                                    _simulatedStrandedPassengers,
-                              );
-                              if (!context.mounted) return;
-                              if (!applied) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      'Could not create the dispatch plan. Check the backend connection and login role.',
+                            onPressed: _isSimulatingBreakdown ||
+                                    _selectedBreakdownBusNumbers.isEmpty
+                                ? null
+                                : () => _simulateBreakdowns(
+                                      provider,
+                                      routes,
+                                      brokenBusNumbers,
                                     ),
-                                  ),
-                                );
-                                return;
-                              }
-                              setState(() {
-                                _isBreakdownTabSelected = true;
-                              });
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    '🚨 Java dispatch plan created for SB-04.',
-                                  ),
-                                  backgroundColor: AppColors.danger,
-                                  behavior: SnackBarBehavior.floating,
-                                ),
-                              );
-                            },
                             icon: const Icon(
                               Icons.warning_amber_rounded,
                               size: 18,
                             ),
-                            label: const Text('Simulate SB-04 Breakdown'),
+                            label: Text(_isSimulatingBreakdown
+                                ? 'Planning emergency dispatch…'
+                                : 'Simulate ${_selectedBreakdownBusNumbers.length} breakdown${_selectedBreakdownBusNumbers.length == 1 ? '' : 's'}'),
                             style: FilledButton.styleFrom(
                               backgroundColor: AppColors.danger,
                               foregroundColor: Colors.white,
@@ -498,7 +1173,7 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
                                   ),
                                   const SizedBox(width: 8),
                                   Text(
-                                    '${breakdown.brokenBusNumber} Breakdown',
+                                    '${breakdown.brokenBusNumbers.length} Active Breakdown${breakdown.brokenBusNumbers.length == 1 ? '' : 's'}',
                                     style: const TextStyle(
                                       color: Colors.white,
                                       fontWeight: FontWeight.w800,
@@ -582,6 +1257,77 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
                                 ),
                               ),
                               const SizedBox(height: 10),
+                              if (breakdown.explanation.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 8),
+                                  child: Text(
+                                    breakdown.explanation,
+                                    style: const TextStyle(
+                                      color: Colors.white60,
+                                      fontSize: 9,
+                                      height: 1.25,
+                                    ),
+                                  ),
+                                ),
+                              OutlinedButton.icon(
+                                onPressed: _isSimulatingBreakdown
+                                    ? null
+                                    : () => _simulateBreakdowns(
+                                          provider,
+                                          routes,
+                                          brokenBusNumbers,
+                                        ),
+                                icon: const Icon(Icons.add_road_rounded,
+                                    size: 16),
+                                label: Text(_isSimulatingBreakdown
+                                    ? 'Planning additional dispatch…'
+                                    : 'Add another bus breakdown'),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: Colors.white,
+                                  minimumSize: const Size(double.infinity, 38),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'RESCUE ROUTE ASSIGNMENTS',
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.8),
+                                  fontSize: 9,
+                                  letterSpacing: 0.8,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              ConstrainedBox(
+                                constraints:
+                                    const BoxConstraints(maxHeight: 96),
+                                child: SingleChildScrollView(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: routes
+                                        .where((route) => rescueBusNumbers
+                                            .contains(route.busNumber))
+                                        .map((route) =>
+                                            _buildRescueAssignmentSummary(
+                                                route, breakdown))
+                                        .toList(),
+                                  ),
+                                ),
+                              ),
+                              if (breakdown.studentsUnassigned > 0)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 4),
+                                  child: Text(
+                                    '${breakdown.studentsUnassigned} passengers still need manual support.',
+                                    style: const TextStyle(
+                                      color: Color(0xFFFBBF24),
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              const SizedBox(height: 8),
 
                               // Interactive Tab Button for Breakdown Bus
                               InkWell(
@@ -627,7 +1373,7 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
                                       const SizedBox(width: 8),
                                       Expanded(
                                         child: Text(
-                                          'Breakdown Bus: ${breakdown.brokenBusNumber}',
+                                          'Broken buses: ${breakdown.brokenBusNumbers.join(', ')}',
                                           style: TextStyle(
                                             color: _isBreakdownTabSelected
                                                 ? Colors.white
@@ -689,8 +1435,11 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
                       children: [
                         Expanded(
                           child: InkWell(
-                            onTap: () =>
-                                setState(() => _isBreakdownTabSelected = false),
+                            onTap: () => setState(() {
+                              _isBreakdownTabSelected = false;
+                              _selectedRoute = null;
+                              _selectedStop = null;
+                            }),
                             child: Container(
                               padding: const EdgeInsets.symmetric(vertical: 6),
                               decoration: BoxDecoration(
@@ -706,7 +1455,7 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
                               ),
                               alignment: Alignment.center,
                               child: Text(
-                                'All Routes (5)',
+                                'All Routes (${routes.length})',
                                 style: TextStyle(
                                   color: !_isBreakdownTabSelected
                                       ? const Color(0xFF60A5FA)
@@ -754,7 +1503,7 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
                     ),
                   ),
 
-                // Main Sidebar Content: Either Breakdown Stops View OR Standard 5 Route List
+                // Main Sidebar Content: Complete route list or breakdown assignments
                 Expanded(
                   child: _isBreakdownTabSelected && breakdown != null
                       ? _buildBreakdownStopsTab(
@@ -763,102 +1512,108 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
                           breakdown,
                           routes,
                         )
-                      : ListView.builder(
-                          padding: const EdgeInsets.all(12),
-                          itemCount: routes.length,
-                          itemBuilder: (context, i) {
-                            final r = routes[i];
-                            final isSelected = _selectedRoute?.id == r.id;
-                            return Container(
-                              margin: const EdgeInsets.only(bottom: 8),
-                              decoration: BoxDecoration(
-                                color: isSelected
-                                    ? r.color.withValues(alpha: 0.18)
-                                    : const Color(
-                                        0xFF1E293B,
-                                      ).withValues(alpha: 0.6),
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(
+                      : Scrollbar(
+                          thumbVisibility: true,
+                          interactive: true,
+                          child: ListView.builder(
+                            padding: const EdgeInsets.all(12),
+                            itemCount: routes.length,
+                            itemBuilder: (context, i) {
+                              final r = routes[i];
+                              final isSelected = _selectedRoute?.id == r.id;
+                              return Container(
+                                margin: const EdgeInsets.only(bottom: 8),
+                                decoration: BoxDecoration(
                                   color: isSelected
-                                      ? r.color
-                                      : r.isBrokenDown
-                                          ? AppColors.danger
-                                          : Colors.transparent,
-                                  width: 1.5,
-                                ),
-                              ),
-                              child: ListTile(
-                                onTap: () {
-                                  setState(() {
-                                    _selectedRoute = isSelected ? null : r;
-                                    _selectedStop = null;
-                                  });
-                                },
-                                leading: CircleAvatar(
-                                  backgroundColor: r.isBrokenDown
-                                      ? AppColors.danger
-                                      : r.color,
-                                  radius: 16,
-                                  child: Icon(
-                                    r.isBrokenDown
-                                        ? Icons.warning_rounded
-                                        : Icons.directions_bus_filled_rounded,
-                                    color: Colors.white,
-                                    size: 16,
+                                      ? r.color.withValues(alpha: 0.18)
+                                      : const Color(
+                                          0xFF1E293B,
+                                        ).withValues(alpha: 0.6),
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: isSelected
+                                        ? r.color
+                                        : r.isBrokenDown
+                                            ? AppColors.danger
+                                            : Colors.transparent,
+                                    width: 1.5,
                                   ),
                                 ),
-                                title: Text(
-                                  r.name,
-                                  style: TextStyle(
-                                    color: r.isBrokenDown
-                                        ? const Color(0xFFFCA5A5)
-                                        : Colors.white,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w700,
+                                child: ListTile(
+                                  onTap: () {
+                                    final nextRoute = isSelected ? null : r;
+                                    setState(() {
+                                      _selectedRoute = nextRoute;
+                                      _selectedStop = null;
+                                    });
+                                    _focusRoute(nextRoute, routes);
+                                  },
+                                  leading: CircleAvatar(
+                                    backgroundColor: r.isBrokenDown
+                                        ? AppColors.danger
+                                        : r.color,
+                                    radius: 16,
+                                    child: Icon(
+                                      r.isBrokenDown
+                                          ? Icons.warning_rounded
+                                          : Icons.directions_bus_filled_rounded,
+                                      color: Colors.white,
+                                      size: 16,
+                                    ),
                                   ),
-                                ),
-                                subtitle: Text(
-                                  '${r.busNumber} • ${r.stops.length} stops (${r.totalDistanceKm} km)',
-                                  style: const TextStyle(
-                                    color: Colors.white54,
-                                    fontSize: 11,
+                                  title: Text(
+                                    r.name,
+                                    style: TextStyle(
+                                      color: r.isBrokenDown
+                                          ? const Color(0xFFFCA5A5)
+                                          : Colors.white,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                    ),
                                   ),
+                                  subtitle: Text(
+                                    '${r.busNumber} • ${r.stops.length} stops (${r.totalDistanceKm} km)',
+                                    style: const TextStyle(
+                                      color: Colors.white54,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                  trailing: r.isBrokenDown
+                                      ? Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 4,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.danger.withValues(
+                                              alpha: 0.2,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
+                                            border: Border.all(
+                                              color: AppColors.danger,
+                                              width: 0.8,
+                                            ),
+                                          ),
+                                          child: const Text(
+                                            'BREAKDOWN',
+                                            style: TextStyle(
+                                              color: AppColors.danger,
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.w900,
+                                            ),
+                                          ),
+                                        )
+                                      : Icon(
+                                          Icons.chevron_right_rounded,
+                                          color: r.color,
+                                          size: 18,
+                                        ),
                                 ),
-                                trailing: r.isBrokenDown
-                                    ? Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 8,
-                                          vertical: 4,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: AppColors.danger.withValues(
-                                            alpha: 0.2,
-                                          ),
-                                          borderRadius: BorderRadius.circular(
-                                            8,
-                                          ),
-                                          border: Border.all(
-                                            color: AppColors.danger,
-                                            width: 0.8,
-                                          ),
-                                        ),
-                                        child: const Text(
-                                          'BREAKDOWN',
-                                          style: TextStyle(
-                                            color: AppColors.danger,
-                                            fontSize: 9,
-                                            fontWeight: FontWeight.w900,
-                                          ),
-                                        ),
-                                      )
-                                    : Icon(
-                                        Icons.chevron_right_rounded,
-                                        color: r.color,
-                                        size: 18,
-                                      ),
-                              ),
-                            );
-                          },
+                              );
+                            },
+                          ),
                         ),
                 ),
 
@@ -1013,62 +1768,179 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
                           'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                       userAgentPackageName: 'com.example.smartbus',
                     ),
+                    if (breakdown != null)
+                      osm.PolylineLayer(
+                        polylines: visibleRoutes
+                            .where((route) =>
+                                rescueBusNumbers.contains(route.busNumber))
+                            .map((route) => osm.Polyline(
+                                  points: _mapPathFor(route),
+                                  color: (_rescueRouteColors[route.busNumber] ??
+                                          Colors.redAccent)
+                                      .withValues(
+                                          alpha: _rescueGlowOn ? 0.25 : 0.12),
+                                  strokeWidth: _rescueGlowOn ? 9 : 6,
+                                  useStrokeWidthInMeter: false,
+                                ))
+                            .toList(),
+                      ),
+                    if (breakdown != null)
+                      osm.PolylineLayer(
+                        polylines: visibleRoutes
+                            .where((route) =>
+                                rescueBusNumbers.contains(route.busNumber))
+                            .map((route) => osm.Polyline(
+                                  points: _mapPathFor(route),
+                                  color: (_rescueRouteColors[route.busNumber] ??
+                                          Colors.redAccent)
+                                      .withValues(
+                                          alpha: _rescueGlowOn ? 0.9 : 0.72),
+                                  strokeWidth: _rescueGlowOn ? 4 : 3,
+                                  useStrokeWidthInMeter: false,
+                                ))
+                            .toList(),
+                      ),
                     osm.PolylineLayer(
-                      polylines: routes
+                      polylines: visibleRoutes
                           .map((route) => osm.Polyline(
-                                points: _pathFor(route),
-                                color: route.color.withValues(
-                                    alpha: _selectedRoute == null ||
-                                            _selectedRoute!.id == route.id
-                                        ? 0.9
-                                        : 0.18),
-                                strokeWidth:
-                                    _selectedRoute?.id == route.id ? 5 : 3,
+                                points: _mapPathFor(route),
+                                color: emphasizedBusNumbers
+                                        .contains(route.busNumber)
+                                    ? (route.isBrokenDown
+                                        ? Colors.redAccent
+                                        : (_rescueRouteColors[
+                                                route.busNumber] ??
+                                            Colors.redAccent))
+                                    : route.color.withValues(
+                                        alpha: _selectedRoute == null ||
+                                                _selectedRoute!.id == route.id
+                                            ? 0.9
+                                            : 0.18),
+                                strokeWidth: emphasizedBusNumbers
+                                        .contains(route.busNumber)
+                                    ? 5
+                                    : _selectedRoute?.id == route.id
+                                        ? 5
+                                        : 3,
                               ))
                           .toList(),
                     ),
+                    if (breakdown != null)
+                      osm.MarkerLayer(
+                        markers: visibleRoutes
+                            .where((route) =>
+                                rescueBusNumbers.contains(route.busNumber) &&
+                                _emergencyRoadPaths
+                                    .containsKey(route.busNumber))
+                            .expand((route) => _directionArrowMarkers(
+                                  route,
+                                  _mapPathFor(route),
+                                ))
+                            .toList(growable: false),
+                      ),
                     osm.MarkerLayer(markers: [
-                      for (final route in routes)
+                      for (final route in visibleRoutes)
                         for (final stop in route.stops)
                           osm.Marker(
-                            point: _snapToRoute(
-                              geo.LatLng(stop.latitude, stop.longitude),
-                              _pathFor(route),
-                            ),
-                            width: 34,
-                            height: 38,
+                            point: stop.isDivertedPickup
+                                ? geo.LatLng(stop.latitude, stop.longitude)
+                                : _snapToRoute(
+                                    geo.LatLng(stop.latitude, stop.longitude),
+                                    _mapPathFor(route),
+                                  ),
+                            width: stop.isBreakdownStranded ||
+                                    stop.isDivertedPickup
+                                ? 46
+                                : 34,
+                            height: stop.isBreakdownStranded ||
+                                    stop.isDivertedPickup
+                                ? 46
+                                : 38,
                             child: GestureDetector(
-                              onTap: () => setState(() {
-                                _selectedRoute = route;
-                                _selectedStop = stop;
-                              }),
+                              onTap: () {
+                                setState(() {
+                                  _selectedRoute = route;
+                                  _selectedStop = stop;
+                                });
+                                _focusRoute(route, routes);
+                              },
                               child: Tooltip(
-                                message: '${route.busNumber} · ${stop.name}',
-                                child: Icon(Icons.location_on,
-                                    size: 32,
-                                    color: stop.isInvalidated
-                                        ? Colors.grey
+                                message: stop.isBreakdownPickup
+                                    ? '${breakdown?.location ?? stop.landmark} · Rescue bus ${route.busNumber} collects stranded passengers here'
+                                    : stop.isDivertedPickup
+                                        ? '${stop.name} · Rescue pickup by ${route.busNumber}'
                                         : stop.isBreakdownStranded
-                                            ? Colors.red
-                                            : route.color),
+                                            ? '${stop.name} · Breakdown stop · Assigned ${stop.assignedPickupBusNumber ?? "manual support"}'
+                                            : '${route.busNumber} · ${stop.name}',
+                                child: Stack(
+                                  alignment: Alignment.center,
+                                  children: [
+                                    if (stop.isBreakdownStranded ||
+                                        stop.isDivertedPickup)
+                                      Container(
+                                        width: 42,
+                                        height: 42,
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          color: (stop.isBreakdownStranded
+                                                  ? Colors.redAccent
+                                                  : (_rescueRouteColors[
+                                                          route.busNumber] ??
+                                                      route.color))
+                                              .withValues(alpha: 0.22),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: stop.isBreakdownStranded
+                                                  ? Colors.redAccent
+                                                  : (_rescueRouteColors[
+                                                          route.busNumber] ??
+                                                      route.color),
+                                              blurRadius: 18,
+                                              spreadRadius: 4,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    Icon(
+                                      stop.isDivertedPickup
+                                          ? Icons.emergency_share_rounded
+                                          : Icons.location_on,
+                                      size: stop.isBreakdownStranded ||
+                                              stop.isDivertedPickup
+                                          ? 36
+                                          : 32,
+                                      color: stop.isInvalidated
+                                          ? Colors.grey
+                                          : stop.isBreakdownStranded
+                                              ? const Color(0xFFF87171)
+                                              : stop.isDivertedPickup
+                                                  ? (_rescueRouteColors[
+                                                          route.busNumber] ??
+                                                      route.color)
+                                                  : route.color,
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
-                      for (final route in routes)
-                        if (_pathFor(route).length > 1)
+                      for (final route in visibleRoutes)
+                        if (_mapPathFor(route).length > 1)
                           osm.Marker(
                             point: _positionOnRoute(
-                                _pathFor(route), routes.indexOf(route) * 0.11),
+                                _mapPathFor(route), route.busNumber),
                             width: 48,
                             height: 48,
                             child: GestureDetector(
-                              onTap: () => setState(() {
-                                _selectedRoute = route;
-                                _selectedStop = null;
-                              }),
+                              onTap: () {
+                                setState(() {
+                                  _selectedRoute = route;
+                                  _selectedStop = null;
+                                });
+                                _focusRoute(route, routes);
+                              },
                               child: Tooltip(
-                                message:
-                                    '${route.busNumber} · simulated bus position',
+                                message: _busTooltip(route),
                                 child: DecoratedBox(
                                   decoration: BoxDecoration(
                                     color: route.isBrokenDown
@@ -1135,7 +2007,9 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
                                 color: Color(0xFF34D399), size: 18),
                             const SizedBox(width: 8),
                             Text(
-                              '${routes.length} routes · drag to pan · scroll or pinch to zoom',
+                              _selectedRoute == null
+                                  ? '${routes.length} routes · drag to pan · scroll or pinch to zoom'
+                                  : 'Focused: ${_selectedRoute!.busNumber} · ${_selectedRoute!.name}',
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.w800,
@@ -1193,6 +2067,54 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
                 // Floating Map Controls
                 Positioned(
                   bottom: 20,
+                  left: 20,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: () => _editSimulationSpeedRange(routes),
+                        icon: const Icon(Icons.speed_rounded),
+                        label: Text(
+                          'Speed range: ${_formatSpeed(_minimumSpeedKmh)}–${_formatSpeed(_maximumSpeedKmh)} km/h',
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          backgroundColor: const Color(0xDD0F172A),
+                          side: const BorderSide(color: Colors.white24),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      FilledButton.icon(
+                        onPressed: routes.isEmpty || !_roadPathsReady
+                            ? null
+                            : () => _toggleFleetSimulation(routes),
+                        icon: Icon(_fleetSimulationRunning
+                            ? Icons.pause_rounded
+                            : Icons.play_arrow_rounded),
+                        label: Text(!_roadPathsReady
+                            ? 'Loading road routes…'
+                            : _fleetSimulationRunning
+                                ? 'Pause fleet simulation'
+                                : _fleetSimulationStarted
+                                    ? 'Resume fleet simulation'
+                                    : 'Start fleet simulation'),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: _fleetSimulationRunning
+                              ? const Color(0xFFB45309)
+                              : const Color(0xFF047857),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 14,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Positioned(
+                  bottom: 20,
                   right: 20,
                   child: Column(
                     children: [
@@ -1215,16 +2137,7 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
                           _selectedRoute = null;
                           _selectedStop = null;
                         });
-                        _mapController.fitCamera(osm.CameraFit.bounds(
-                          bounds: osm.LatLngBounds.fromPoints(
-                            context
-                                .read<SmartBusProvider>()
-                                .liveRoutes
-                                .expand(_pathFor)
-                                .toList(),
-                          ),
-                          padding: const EdgeInsets.all(72),
-                        ));
+                        _focusRoute(null, routes);
                       }),
                       const SizedBox(height: 10),
                       _mapFab(Icons.info_outline_rounded, 'Stops Info', () {
@@ -1234,6 +2147,7 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
                             _selectedRoute = routes.first;
                             _selectedStop = routes.first.stops[2];
                           });
+                          _focusRoute(routes.first, routes);
                         }
                       }),
                     ],
@@ -1282,21 +2196,11 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
     BreakdownRerouteEvent breakdown,
     List<LiveBusRoute> routes,
   ) {
-    // Find the broken route to access its full stops list
-    LiveBusRoute? brokenRoute;
-    for (final r in routes) {
-      if (r.busNumber == breakdown.brokenBusNumber) {
-        brokenRoute = r;
-        break;
-      }
-    }
-
-    final stops = brokenRoute?.stops ?? [];
-    // Identify broken stop order (usually stops from index 2 onwards are remaining)
-    final remainingStops = stops
-        .where(
-          (s) => s.order >= 3 && breakdown.affectedStopNames.contains(s.name),
-        )
+    final brokenBusNumbers = breakdown.brokenBusNumbers.toSet();
+    final remainingStops = routes
+        .where((route) => brokenBusNumbers.contains(route.busNumber))
+        .expand((route) => route.stops)
+        .where((stop) => stop.isBreakdownStranded)
         .toList();
 
     return Column(
@@ -1315,7 +2219,7 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '${breakdown.brokenBusNumber} Remaining Stops (${remainingStops.length})',
+                      '${brokenBusNumbers.join(', ')} Remaining Stops (${remainingStops.length})',
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 12,
@@ -1359,7 +2263,10 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
                 (a) => a.stopId == stop.id,
               );
               final currentAssignedBus = assignmentMatch.isNotEmpty
-                  ? assignmentMatch.first.assignedBusNumber
+                  ? assignmentMatch
+                      .map((assignment) => assignment.assignedBusNumber)
+                      .toSet()
+                      .join(', ')
                   : (stop.assignedPickupBusNumber ?? 'Unassigned');
 
               return Container(
@@ -1531,7 +2438,7 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
                         const SizedBox(height: 10),
                         Text(
                           assignmentMatch.isNotEmpty
-                              ? '${assignmentMatch.first.studentCount} estimated passengers • ${assignmentMatch.first.spareSeatsBefore} spare seats before assignment • ${assignmentMatch.first.detourDistanceKm.toStringAsFixed(1)} km straight-line detour estimate'
+                              ? '${assignmentMatch.fold<int>(0, (sum, item) => sum + item.studentCount)} estimated passengers • assigned across ${assignmentMatch.map((item) => item.assignedBusNumber).toSet().length} bus(es) • ${assignmentMatch.fold<double>(0, (sum, item) => sum + item.detourDistanceKm).toStringAsFixed(1)} km detour estimate'
                               : '${breakdown.unassignedStudentsByStop[stop.id] ?? 0} estimated passengers • no single active bus currently has enough spare seats',
                           style: TextStyle(
                             color: assignmentMatch.isNotEmpty
@@ -1555,11 +2462,16 @@ class _AdminLiveMapScreenState extends State<AdminLiveMapScreen> {
                           runSpacing: 6,
                           children: routes
                               .where(
-                            (r) => r.busNumber != breakdown.brokenBusNumber,
+                            (r) => !brokenBusNumbers.contains(r.busNumber),
                           )
                               .map((rt) {
-                            final isAssigned =
-                                currentAssignedBus == rt.busNumber;
+                            final isAssigned = assignmentMatch.any(
+                                  (assignment) =>
+                                      assignment.assignedBusNumber ==
+                                      rt.busNumber,
+                                ) ||
+                                (assignmentMatch.isEmpty &&
+                                    currentAssignedBus == rt.busNumber);
                             return ChoiceChip(
                               label: Text(
                                 rt.busNumber,
@@ -1803,7 +2715,7 @@ class _UnifiedFleetMapPainter extends CustomPainter {
 
         final isStranded = (stop.isBreakdownStranded ||
                 (breakdown != null &&
-                    breakdown!.brokenBusNumber == route.busNumber &&
+                    breakdown!.brokenBusNumbers.contains(route.busNumber) &&
                     i >= 2)) &&
             !isInvalidated;
 

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../mock/mock_data.dart';
 import '../../models/app_models.dart';
+import '../../providers/smart_bus_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/admin_widgets.dart';
 import '../incharge/incharge_route_detail.dart';
@@ -13,14 +15,42 @@ class AdminRoutes extends StatefulWidget {
 }
 
 class _AdminRoutesState extends State<AdminRoutes> {
-  String _selectedStatus = 'Pending';
+  String _selectedStatus = 'Fleet Routes';
+
+  RouteRecord _toFleetRouteRecord(LiveBusRoute route) => RouteRecord(
+        id: route.id,
+        routeName: route.name,
+        busId: route.id,
+        busNumber: route.busNumber,
+        inchargeId: route.busNumber,
+        inchargeName: route.driverName,
+        distanceKm: route.totalDistanceKm,
+        durationMinutes: route.totalDurationMinutes,
+        createdAt: 'Hyderabad demo fleet',
+        status: 'Active',
+        stops: route.stops
+            .map((stop) => RecordedBoardingStop(
+                  id: stop.id,
+                  name: stop.name,
+                  landmark: stop.landmark,
+                  type: 'Pickup',
+                  estimatedWaitMinutes: stop.estimatedArrivalMinutes,
+                  latitude: stop.latitude,
+                  longitude: stop.longitude,
+                ))
+            .toList(growable: false),
+      );
 
   @override
   Widget build(BuildContext context) {
-    final routes = MockData.routeRecords.where((r) {
-      if (_selectedStatus == 'All') return true;
-      return r.status == _selectedStatus;
-    }).toList();
+    final fleetRoutes = context.watch<SmartBusProvider>().liveRoutes;
+    final showingFleetRoutes = _selectedStatus == 'Fleet Routes';
+    final routes = showingFleetRoutes
+        ? fleetRoutes.map(_toFleetRouteRecord).toList()
+        : MockData.routeRecords.where((route) {
+            if (_selectedStatus == 'All') return true;
+            return route.status == _selectedStatus;
+          }).toList();
 
     return Scaffold(
       body: SingleChildScrollView(
@@ -28,19 +58,19 @@ class _AdminRoutesState extends State<AdminRoutes> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Row(
+            Row(
               children: [
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Route Approvals',
+                      const Text(
+                        'Routes & Approvals',
                         style: TextStyle(
                             fontSize: 22, fontWeight: FontWeight.w800),
                       ),
                       Text(
-                        'Review, preview, and approve boarding routes submitted by Bus In-charges',
+                        'Browse ${fleetRoutes.length} Hyderabad fleet routes or review route submissions',
                         style: TextStyle(color: AppColors.muted, fontSize: 13),
                       ),
                     ],
@@ -52,13 +82,22 @@ class _AdminRoutesState extends State<AdminRoutes> {
 
             // Tab bar for filtering route status
             Row(
-              children:
-                  ['Pending', 'Approved', 'Rejected', 'All'].map((status) {
+              children: [
+                'Fleet Routes',
+                'Pending',
+                'Approved',
+                'Rejected',
+                'All',
+              ].map((status) {
                 final isSelected = _selectedStatus == status;
                 return Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: ChoiceChip(
-                    label: Text(status),
+                    label: Text(status == 'Fleet Routes'
+                        ? 'Fleet Routes (${fleetRoutes.length})'
+                        : status == 'All'
+                            ? 'All Requests'
+                            : status),
                     selected: isSelected,
                     onSelected: (val) {
                       if (val) setState(() => _selectedStatus = status);
@@ -115,8 +154,12 @@ class _AdminRoutesState extends State<AdminRoutes> {
                       final route = routes[index];
                       return ApprovalRouteCard(
                         route: route,
-                        onApprove: () => _approveRoute(route),
-                        onReject: () => _rejectRoute(route),
+                        onApprove: showingFleetRoutes
+                            ? null
+                            : () => _approveRoute(route),
+                        onReject: showingFleetRoutes
+                            ? null
+                            : () => _rejectRoute(route),
                         onView: () => _viewRouteDetails(route),
                       );
                     },

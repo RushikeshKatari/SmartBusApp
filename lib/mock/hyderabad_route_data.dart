@@ -36,10 +36,10 @@ class HyderabadRouteData {
   HyderabadRouteData._();
 
   static const campus = DemoStopPoint(
-    'KLH Aziz Nagar Campus',
+    'KLH Aziz Nagar Campus Parking',
     17.348301,
     78.339918,
-    'RVS Nagar, Moinabad Road',
+    'College bus parking · RVS Nagar, Moinabad Road',
   );
   static const campusApproach = DemoStopPoint(
     'TSPA Junction',
@@ -518,8 +518,7 @@ class HyderabadRouteData {
     const radius = 6371.0;
     final dLat = _radians(b.latitude - a.latitude);
     final dLon = _radians(b.longitude - a.longitude);
-    final x =
-        math.sin(dLat / 2) * math.sin(dLat / 2) +
+    final x = math.sin(dLat / 2) * math.sin(dLat / 2) +
         math.cos(_radians(a.latitude)) *
             math.cos(_radians(b.latitude)) *
             math.sin(dLon / 2) *

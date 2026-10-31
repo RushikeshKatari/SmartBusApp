@@ -198,12 +198,25 @@ class HomeScreen extends StatelessWidget {
                             ...breakdown.stopAssignments.map(
                               (assignment) => Padding(
                                 padding: const EdgeInsets.only(top: 3),
-                                child: Text(
-                                  '${assignment.stopName} → ${assignment.assignedBusNumber} · ${assignment.studentCount} passengers',
-                                  style: const TextStyle(
-                                    color: Colors.white70,
-                                    fontSize: 10,
-                                  ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '${assignment.stopName} → ${assignment.assignedBusNumber} · ${assignment.studentCount} passengers · ${assignment.estimatedArrival}',
+                                      style: const TextStyle(
+                                        color: Colors.white70,
+                                        fontSize: 10,
+                                      ),
+                                    ),
+                                    if (assignment.assignmentReason.isNotEmpty)
+                                      Text(
+                                        assignment.assignmentReason,
+                                        style: const TextStyle(
+                                          color: Colors.white54,
+                                          fontSize: 9,
+                                        ),
+                                      ),
+                                  ],
                                 ),
                               ),
                             ),

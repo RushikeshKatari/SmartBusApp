@@ -11,9 +11,23 @@ class AdminDashboard extends StatelessWidget {
   const AdminDashboard({super.key});
 
   static String _monthName(int month) {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
+    ];
     return months[month - 1];
   }
+
   @override
   Widget build(BuildContext context) {
     final buses = MockData.buses;
@@ -37,7 +51,7 @@ class AdminDashboard extends StatelessWidget {
                         style: TextStyle(
                             fontSize: 24, fontWeight: FontWeight.w800)),
                     Text(
-                        '${DateTime.now().day} ${_monthName(DateTime.now().month)} ${DateTime.now().year} · ${routes.length} pending approvals',
+                        '${DateTime.now().day} ${_monthName(DateTime.now().month)} ${DateTime.now().year} · ${pendingRoutes.length} pending approvals',
                         style: const TextStyle(
                             color: AppColors.muted, fontSize: 14)),
                   ],
@@ -52,7 +66,8 @@ class AdminDashboard extends StatelessWidget {
                   );
                 },
                 icon: const Icon(Icons.map_rounded, size: 18),
-                label: const Text('Live Fleet Map (5 Routes)'),
+                label: Text(
+                    'Live Fleet Map (${MockData.liveBusRoutes.length} Routes)'),
                 style: FilledButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   padding:

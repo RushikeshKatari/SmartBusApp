@@ -71,70 +71,98 @@ public class OperationsController {
         List<String> rescueBusNumbers,
         String status,
         String explanation,
-        String createdAt
+        String createdAt,
+        double dispatchObjectiveScore,
+        int replanningRevision
     ) {}
 
-    // In-memory active breakdowns cache for instant real-time dispatch
+    // Active scenario state is replayed in incident order whenever fleet state changes.
     private final List<BreakdownResponse> activeBreakdowns = new java.util.concurrent.CopyOnWriteArrayList<>();
+    private final List<PendingIncident> pendingIncidents = new java.util.concurrent.CopyOnWriteArrayList<>();
+    private int replanningRevision = 0;
+
+    private record PendingIncident(UUID id, BreakdownRequest request, String createdAt) {}
 
     @PostMapping({"/operations/breakdown", "/incharge/breakdown"})
-    public ResponseEntity<BreakdownResponse> reportBreakdown(@RequestBody BreakdownRequest request) {
-        // Automatic optimal bus evaluation & reroute calculation
-        var reroute = routeOptimizer.calculateOptimalReroute(
-            request.busId(),
-            request.busNumber(),
-            request.latitude(),
-            request.longitude(),
-            Math.max(0, request.strandedStudentsCount())
-        );
-        List<String> rescueBuses = reroute.assignments().stream()
-                .map(RouteOptimizerService.StopAssignment::assignedBusNumber)
-                .distinct().toList();
-        var firstAssignment = reroute.assignments().isEmpty() ? null : reroute.assignments().getFirst();
+    public synchronized ResponseEntity<BreakdownResponse> reportBreakdown(@RequestBody BreakdownRequest request) {
+        if (pendingIncidents.stream().anyMatch(i -> i.request().busNumber().equalsIgnoreCase(request.busNumber()))) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "This bus already has an active breakdown incident");
+        }
+        PendingIncident addedIncident = new PendingIncident(
+                UUID.randomUUID(), request, Instant.now().toString());
+        pendingIncidents.add(addedIncident);
+        try {
+            replanAllActiveIncidents();
+        } catch (RuntimeException exception) {
+            pendingIncidents.remove(addedIncident);
+            replanAllActiveIncidents();
+            throw exception;
+        }
+        BreakdownResponse response = activeBreakdowns.stream()
+                .filter(active -> active.id().equals(addedIncident.id()))
+                .findFirst().orElseThrow();
 
-        BreakdownResponse response = new BreakdownResponse(
-            UUID.randomUUID(),
-            request.busNumber(),
-            request.inchargeName(),
-            request.reason(),
-            request.location(),
-            firstAssignment == null ? "No capacity available" : firstAssignment.assignedBusNumber(),
-            firstAssignment == null ? "Unassigned" : firstAssignment.driverName(),
-            firstAssignment == null ? "" : firstAssignment.driverPhone(),
-            reroute.totalDetourDistanceKm(),
-            reroute.estimatedAdditionalMinutes(),
-            reroute.strandedStudents(),
-            reroute.strandedStudents() - reroute.unassignedStudents(),
-            reroute.unassignedStudents(),
-            reroute.affectedStopsCount(),
-            reroute.coveredStopsCount(),
-            reroute.allStopsCovered(),
-            reroute.assignments(),
-            reroute.unassignedStudentsByStop(),
-            rescueBuses,
-            "ACTIVE_REROUTING",
-            reroute.explanation(),
-            Instant.now().toString()
-        );
-
-        activeBreakdowns.add(0, response);
-
-        // Also record as an emergency report in DB
+        // Also record the incident under the same id so resolving it updates the dispatch state.
         EmergencyReport report = new EmergencyReport();
-        report.id = UUID.randomUUID();
+        report.id = addedIncident.id();
         report.type = "BREAKDOWN: " + request.reason();
         report.details = response.explanation();
         report.location = request.location();
         report.status = "OPEN";
         report.createdAt = Instant.now();
         emergencies.save(report);
-
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    private void replanAllActiveIncidents() {
+        replanningRevision++;
+        var unavailableBusNumbers = new HashSet<String>();
+        pendingIncidents.forEach(i -> unavailableBusNumbers.add(i.request().busNumber()));
+        var committedPassengers = new HashMap<String, Integer>();
+        var replanned = new ArrayList<BreakdownResponse>();
+        for (PendingIncident incident : pendingIncidents) {
+            BreakdownRequest request = incident.request();
+            var plan = routeOptimizer.calculateOptimalReroute(
+                    request.busId(), request.busNumber(), request.latitude(), request.longitude(),
+                    Math.max(0, request.strandedStudentsCount()), unavailableBusNumbers, committedPassengers);
+            List<String> rescueBuses = plan.assignments().stream()
+                    .map(RouteOptimizerService.StopAssignment::assignedBusNumber).distinct().toList();
+            var firstAssignment = plan.assignments().isEmpty() ? null : plan.assignments().getFirst();
+            String explanation = plan.explanation() + " Replanning revision " + replanningRevision
+                    + " recalculates all active incidents in reported order.";
+            replanned.add(new BreakdownResponse(
+                    incident.id(), request.busNumber(), request.inchargeName(), request.reason(), request.location(),
+                    firstAssignment == null ? "No capacity available" : firstAssignment.assignedBusNumber(),
+                    firstAssignment == null ? "Unassigned" : firstAssignment.driverName(),
+                    firstAssignment == null ? "" : firstAssignment.driverPhone(),
+                    plan.totalDetourDistanceKm(), plan.estimatedAdditionalMinutes(),
+                    plan.strandedStudents(), plan.strandedStudents() - plan.unassignedStudents(),
+                    plan.unassignedStudents(), plan.affectedStopsCount(), plan.coveredStopsCount(),
+                    plan.allStopsCovered(), plan.assignments(), plan.unassignedStudentsByStop(), rescueBuses,
+                    "ACTIVE_REROUTING", explanation, incident.createdAt(),
+                    plan.dispatchObjectiveScore(), replanningRevision));
+            emergencies.findById(incident.id()).ifPresent(report -> {
+                report.details = explanation;
+                emergencies.save(report);
+            });
+            plan.assignments().forEach(a -> committedPassengers.merge(
+                    a.assignedBusNumber(), a.studentCount(), Integer::sum));
+        }
+        activeBreakdowns.clear();
+        for (int i = replanned.size() - 1; i >= 0; i--) activeBreakdowns.add(replanned.get(i));
     }
 
     @GetMapping("/operations/breakdowns/active")
     public List<BreakdownResponse> getActiveBreakdowns() {
         return activeBreakdowns;
+    }
+
+    @PostMapping("/operations/breakdowns/resolve")
+    public synchronized ResponseEntity<Void> resolveActiveBreakdowns() {
+        activeBreakdowns.clear();
+        pendingIncidents.clear();
+        replanningRevision++;
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/incharge/attendance")
@@ -195,7 +223,10 @@ public class OperationsController {
         EmergencyReport r = emergencies.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         r.status = "RESOLVED";
         r.resolvedAt = Instant.now();
-        activeBreakdowns.removeIf(b -> b.id().equals(id));
+        synchronized (this) {
+            pendingIncidents.removeIf(i -> i.id().equals(id));
+            replanAllActiveIncidents();
+        }
         return emergencies.save(r);
     }
 }

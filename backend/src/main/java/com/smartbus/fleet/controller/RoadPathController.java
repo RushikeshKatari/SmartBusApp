@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/fleet")
 public class RoadPathController {
+    public record RoadPathRequest(List<OsmRoutingClient.GeoPoint> waypoints) {}
     private final BusRepository buses;
     private final StopRepository stops;
     private final OsmRoutingClient routing;
@@ -51,5 +52,17 @@ public class RoadPathController {
                     "source", roadPath.source()));
         }
         return result;
+    }
+
+    /** Road-following geometry for an ordered emergency route created in the simulator. */
+    @org.springframework.web.bind.annotation.PostMapping("/road-path")
+    public OsmRoutingClient.RoadPath roadPath(@org.springframework.web.bind.annotation.RequestBody RoadPathRequest request) {
+        if (request.waypoints() == null || request.waypoints().size() < 2
+                || request.waypoints().size() > 100) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST,
+                    "Provide between 2 and 100 route waypoints");
+        }
+        return routing.roadPath(request.waypoints());
     }
 }

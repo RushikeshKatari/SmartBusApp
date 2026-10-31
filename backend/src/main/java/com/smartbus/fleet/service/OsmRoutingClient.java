@@ -31,7 +31,7 @@ public class OsmRoutingClient {
             @SuppressWarnings("unchecked")
             Map<String, Object> response = client.get()
                     .uri(baseUrl.replaceAll("/$", "") + "/route/v1/driving/"
-                            + coordinates + "?overview=full&geometries=geojson&steps=false&alternatives=false")
+                            + coordinates + "?overview=full&geometries=geojson&steps=false&alternatives=false&continue_straight=true")
                     .retrieve()
                     .body(Map.class);
             if (!"Ok".equals(response.get("code"))) return new RoadPath(fallback, "STRAIGHT_LINE_FALLBACK");

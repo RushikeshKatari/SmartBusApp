@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -68,10 +69,283 @@ class SmartBusProvider extends ChangeNotifier {
 
   // ─── 5 LIVE BUS ROUTES & AUTOMATED REROUTING ──────────────
   List<LiveBusRoute> _liveRoutes = List.from(MockData.liveBusRoutes);
+  List<LiveBusRoute>? _routesBeforeBreakdowns;
   List<LiveBusRoute> get liveRoutes => List.unmodifiable(_liveRoutes);
 
   BreakdownRerouteEvent? _activeBreakdown;
   BreakdownRerouteEvent? get activeBreakdown => _activeBreakdown;
+
+  BreakdownRerouteEvent _mergeBreakdownEvents(
+    BreakdownRerouteEvent? previous,
+    BreakdownRerouteEvent next,
+  ) {
+    if (previous == null) return next;
+    final incidents =
+        {...previous.brokenBusNumbers, ...next.brokenBusNumbers}.toList();
+    return BreakdownRerouteEvent(
+      id: '${previous.id}|${next.id}',
+      brokenBusNumber: previous.brokenBusNumber,
+      brokenBusName: incidents.join(', '),
+      inchargeName: previous.inchargeName,
+      reason: 'Multiple fleet breakdowns',
+      location: 'Multiple Hyderabad locations',
+      strandedStudentsCount:
+          previous.strandedStudentsCount + next.strandedStudentsCount,
+      assignedPickupBusNumber: previous.assignedPickupBusNumber,
+      assignedPickupBusName: 'Multiple rescue assignments',
+      assignedPickupDriver: previous.assignedPickupDriver,
+      assignedPickupDriverPhone: previous.assignedPickupDriverPhone,
+      detourDistanceKm: previous.detourDistanceKm + next.detourDistanceKm,
+      detourEtaMinutes:
+          math.max(previous.detourEtaMinutes, next.detourEtaMinutes),
+      explanation: '${incidents.length} active incidents · ${next.explanation}',
+      affectedStopNames:
+          {...previous.affectedStopNames, ...next.affectedStopNames}.toList(),
+      createdAt: previous.createdAt,
+      stopAssignments: [...previous.stopAssignments, ...next.stopAssignments],
+      unassignedStudentsByStop: {
+        ...previous.unassignedStudentsByStop,
+        ...next.unassignedStudentsByStop,
+      },
+      totalRemainingStops:
+          previous.totalRemainingStops + next.totalRemainingStops,
+      coveredRemainingStops:
+          previous.coveredRemainingStops + next.coveredRemainingStops,
+      allStopsCovered: previous.allStopsCovered && next.allStopsCovered,
+      incidentBusNumbers: incidents,
+    );
+  }
+
+  /// Refreshes the complete server dispatch snapshot after a new incident.
+  /// The backend may have changed earlier assignments during rolling replanning.
+  Future<void> _refreshActiveBreakdownSnapshot() async {
+    try {
+      final response = await http
+          .get(
+            Uri.parse(AppConfig.endpoint('/api/operations/breakdowns/active')),
+            headers: AuthApiService.authenticatedHeaders,
+          )
+          .timeout(const Duration(seconds: 12));
+      if (response.statusCode != 200) return;
+      final raw = jsonDecode(response.body);
+      if (raw is! List || raw.isEmpty) return;
+      final fleetBaseline = _routesBeforeBreakdowns ?? _liveRoutes;
+      final parsed = <BreakdownRerouteEvent>[];
+      for (final value in raw) {
+        if (value is! Map<String, dynamic>) continue;
+        final brokenNumber = value['brokenBusNumber']?.toString() ?? '';
+        final brokenRoute = fleetBaseline
+            .where((route) => route.busNumber == brokenNumber)
+            .firstOrNull;
+        if (brokenRoute == null) continue;
+        final originalStops = brokenRoute.stops
+            .skip(2)
+            .where((stop) => !_isCampusStop(stop.name))
+            .toList();
+        final assignments = <DivertedStopAssignment>[];
+        final assignmentRows = value['assignments'] as List<dynamic>? ?? [];
+        for (final row in assignmentRows) {
+          if (row is! Map<String, dynamic>) continue;
+          final stopName = row['stopName']?.toString() ?? '';
+          final stop =
+              originalStops.where((item) => item.name == stopName).firstOrNull;
+          if (stop == null) continue;
+          final assignedNumber = row['assignedBusNumber']?.toString() ?? '';
+          final rescueRoute = fleetBaseline
+              .where((route) => route.busNumber == assignedNumber)
+              .firstOrNull;
+          final arrival =
+              (row['estimatedArrivalMinutes'] as num?)?.toInt() ?? 0;
+          assignments.add(DivertedStopAssignment(
+            stopId: stop.id,
+            stopName: stop.name,
+            originalBusNumber: brokenNumber,
+            assignedBusNumber: assignedNumber,
+            assignedBusName: row['assignedBusName']?.toString() ??
+                rescueRoute?.busName ??
+                assignedNumber,
+            driverName: row['driverName']?.toString() ??
+                rescueRoute?.driverName ??
+                'Unassigned',
+            driverPhone: row['driverPhone']?.toString() ??
+                rescueRoute?.driverPhone ??
+                '',
+            latitude: stop.latitude,
+            longitude: stop.longitude,
+            isUturnRequired: true,
+            detourDistanceKm:
+                (row['detourDistanceKm'] as num?)?.toDouble() ?? 0,
+            estimatedArrival: '~$arrival min to breakdown pickup',
+            studentCount: (row['studentCount'] as num?)?.toInt() ?? 0,
+            spareSeatsBefore: (row['spareSeatsBefore'] as num?)?.toInt() ?? 0,
+            estimatedArrivalMinutes: arrival,
+            assignmentReason: row['assignmentReason']?.toString() ?? '',
+          ));
+        }
+        final rawUnassigned =
+            value['unassignedStudentsByStop'] as Map<String, dynamic>? ?? {};
+        final unassigned = <String, int>{};
+        for (final stop in originalStops) {
+          final count = rawUnassigned[stop.name];
+          if (count is num && count > 0) unassigned[stop.id] = count.toInt();
+        }
+        final primary = assignments.firstOrNull;
+        final primaryRoute = fleetBaseline
+            .where((route) => route.busNumber == primary?.assignedBusNumber)
+            .firstOrNull;
+        parsed.add(BreakdownRerouteEvent(
+          id: value['id']?.toString() ?? brokenNumber,
+          brokenBusNumber: brokenNumber,
+          brokenBusName: brokenRoute.busName,
+          inchargeName: value['inchargeName']?.toString() ?? '',
+          reason: value['reason']?.toString() ?? 'Breakdown',
+          location: value['location']?.toString() ?? '',
+          strandedStudentsCount:
+              (value['strandedStudentsCount'] as num?)?.toInt() ?? 0,
+          assignedPickupBusNumber:
+              primary?.assignedBusNumber ?? 'No capacity available',
+          assignedPickupBusName:
+              primaryRoute?.busName ?? 'Manual support required',
+          assignedPickupDriver: primary?.driverName ?? 'Unassigned',
+          assignedPickupDriverPhone: primary?.driverPhone ?? '',
+          detourDistanceKm:
+              (value['detourDistanceKm'] as num?)?.toDouble() ?? 0,
+          detourEtaMinutes: (value['detourEtaMinutes'] as num?)?.toInt() ?? 0,
+          explanation: value['explanation']?.toString() ?? '',
+          affectedStopNames: originalStops.map((stop) => stop.name).toList(),
+          createdAt: value['createdAt']?.toString() ?? '',
+          stopAssignments: assignments,
+          unassignedStudentsByStop: unassigned,
+          totalRemainingStops: (value['affectedStopsCount'] as num?)?.toInt() ??
+              originalStops.length,
+          coveredRemainingStops:
+              (value['coveredStopsCount'] as num?)?.toInt() ??
+                  assignments.map((a) => a.stopId).toSet().length,
+          allStopsCovered: value['allStopsCovered'] as bool? ?? false,
+          incidentBusNumbers: [brokenNumber],
+        ));
+      }
+      if (parsed.isNotEmpty) {
+        _activeBreakdown = parsed.reduce(_mergeBreakdownEvents);
+        _rebuildRoutesFromActiveIncidents(parsed);
+        notifyListeners();
+      }
+    } catch (_) {
+      // Keep the just-created local view if the active snapshot cannot be read.
+    }
+  }
+
+  void _rebuildRoutesFromActiveIncidents(
+    List<BreakdownRerouteEvent> incidents,
+  ) {
+    final baseline = _routesBeforeBreakdowns ??
+        List<LiveBusRoute>.from(MockData.liveBusRoutes);
+    final routeByNumber = {
+      for (final route in baseline) route.busNumber: route
+    };
+    final orderedIncidents = [...incidents]
+      ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    final emergencyStopsByBus = <String, List<LiveRouteStop>>{};
+    final detourByBus = <String, double>{};
+    final brokenRoutes = <String, LiveBusRoute>{};
+
+    for (final incident in orderedIncidents) {
+      final brokenRoute = routeByNumber[incident.brokenBusNumber];
+      if (brokenRoute == null) continue;
+      final brokenPoint = brokenRoute.stops.length > 1
+          ? brokenRoute.stops[1]
+          : brokenRoute.stops.first;
+      final assignmentsByStop = <String, List<DivertedStopAssignment>>{};
+      for (final assignment in incident.stopAssignments) {
+        assignmentsByStop
+            .putIfAbsent(assignment.stopName, () => [])
+            .add(assignment);
+        detourByBus.update(assignment.assignedBusNumber,
+            (value) => value + assignment.detourDistanceKm,
+            ifAbsent: () => assignment.detourDistanceKm);
+      }
+      final markedStops = brokenRoute.stops.map((stop) {
+        final assignments = assignmentsByStop[stop.name];
+        if (!incident.affectedStopNames.contains(stop.name)) return stop;
+        return stop.copyWith(
+          isBreakdownStranded: true,
+          assignedPickupBusNumber: assignments == null || assignments.isEmpty
+              ? null
+              : assignments
+                  .map((assignment) => assignment.assignedBusNumber)
+                  .toSet()
+                  .join(', '),
+        );
+      }).toList();
+      brokenRoutes[brokenRoute.busNumber] = brokenRoute.copyWith(
+        isBrokenDown: true,
+        breakdownReason: incident.reason,
+        breakdownLocation: incident.location,
+        assignedReplacementBusNumber: incident.assignedPickupBusNumber,
+        stops: markedStops,
+      );
+
+      final assignmentsByBus = <String, List<DivertedStopAssignment>>{};
+      for (final assignment in incident.stopAssignments) {
+        assignmentsByBus
+            .putIfAbsent(assignment.assignedBusNumber, () => [])
+            .add(assignment);
+      }
+      for (final entry in assignmentsByBus.entries) {
+        final rescueBus = entry.key;
+        final list = emergencyStopsByBus.putIfAbsent(rescueBus, () => []);
+        list.add(LiveRouteStop(
+          id: 'BREAKDOWN-${incident.brokenBusNumber}',
+          name: 'Breakdown pickup · ${incident.brokenBusNumber}',
+          landmark: incident.location,
+          latitude: brokenPoint.latitude,
+          longitude: brokenPoint.longitude,
+          order: list.length + 1,
+          isDivertedPickup: true,
+          isBreakdownPickup: true,
+          originalBusNumber: incident.brokenBusNumber,
+          assignedPickupBusNumber: rescueBus,
+        ));
+        for (final assignment in entry.value) {
+          final sourceStop = brokenRoute.stops
+              .where((stop) => stop.name == assignment.stopName)
+              .firstOrNull;
+          if (sourceStop == null) continue;
+          list.add(sourceStop.copyWith(
+            order: list.length + 1,
+            isDivertedPickup: true,
+            isBreakdownStranded: false,
+            originalBusNumber: incident.brokenBusNumber,
+            assignedPickupBusNumber: rescueBus,
+            isUturnDetour: true,
+            divertedOrderLabel:
+                'Rescue pickup (${assignment.studentCount} students)',
+          ));
+        }
+      }
+    }
+
+    _liveRoutes = baseline.map((route) {
+      final broken = brokenRoutes[route.busNumber];
+      if (broken != null) return broken;
+      final emergencyStops = emergencyStopsByBus[route.busNumber];
+      final baseStops =
+          route.stops.where((stop) => !stop.isDivertedPickup).toList();
+      if (emergencyStops == null || emergencyStops.isEmpty) return route;
+      final combined = [...emergencyStops, ...baseStops];
+      for (var i = 0; i < combined.length; i++) {
+        combined[i] = combined[i].copyWith(order: i + 1);
+      }
+      final detour = detourByBus[route.busNumber] ?? 0;
+      return route.copyWith(
+        stops: combined,
+        totalDistanceKm: route.totalDistanceKm + detour,
+        totalDurationMinutes: route.totalDurationMinutes +
+            (detour / BreakdownDispatchPlanner.assumedAverageSpeedKmh * 60)
+                .ceil(),
+      );
+    }).toList();
+  }
 
   double _distanceKm(double lat1, double lon1, double lat2, double lon2) {
     const p = 0.017453292519943295;
@@ -90,6 +364,69 @@ class SmartBusProvider extends ChangeNotifier {
         lower.contains('klh aziz nagar campus');
   }
 
+  /// Updates a demo fleet route's ordered stop path for the current session.
+  /// Route editing is disabled during an active breakdown so emergency pickups
+  /// cannot be lost while rescue routes are assigned.
+  bool adminUpdateRoutePath(
+    String busNumber,
+    List<RecordedBoardingStop> updatedStops,
+  ) {
+    if (_activeBreakdown != null || updatedStops.length < 2) return false;
+    final routeIndex = _liveRoutes.indexWhere(
+      (route) => route.busNumber == busNumber,
+    );
+    if (routeIndex == -1) return false;
+
+    final stops = <LiveRouteStop>[];
+    var distanceKm = 0.0;
+    for (var index = 0; index < updatedStops.length; index++) {
+      final stop = updatedStops[index];
+      if (!stop.latitude.isFinite ||
+          !stop.longitude.isFinite ||
+          stop.latitude < -90 ||
+          stop.latitude > 90 ||
+          stop.longitude < -180 ||
+          stop.longitude > 180) {
+        return false;
+      }
+      final distanceFromPrevious = index == 0
+          ? 0.0
+          : _distanceKm(
+              updatedStops[index - 1].latitude,
+              updatedStops[index - 1].longitude,
+              stop.latitude,
+              stop.longitude,
+            );
+      distanceKm += distanceFromPrevious;
+      stops.add(
+        LiveRouteStop(
+          id: stop.id,
+          name: stop.name,
+          landmark: stop.landmark,
+          latitude: stop.latitude,
+          longitude: stop.longitude,
+          order: index + 1,
+          distanceFromPreviousKm: distanceFromPrevious,
+          estimatedArrivalMinutes: (distanceKm /
+                  BreakdownDispatchPlanner.assumedAverageSpeedKmh *
+                  60)
+              .round(),
+        ),
+      );
+    }
+
+    _liveRoutes[routeIndex] = _liveRoutes[routeIndex].copyWith(
+      stops: stops,
+      totalDistanceKm: distanceKm,
+      totalDurationMinutes:
+          (distanceKm / BreakdownDispatchPlanner.assumedAverageSpeedKmh * 60)
+              .round(),
+      hasCustomPath: true,
+    );
+    notifyListeners();
+    return true;
+  }
+
   /// Create an explainable, capacity-constrained rescue plan for the demo fleet.
   /// Passenger counts are evenly estimated per remaining stop until the app has
   /// connected, per-stop attendance demand.
@@ -105,6 +442,7 @@ class SmartBusProvider extends ChangeNotifier {
     if (brokenIndex == -1) return false;
 
     final brokenRoute = _liveRoutes[brokenIndex];
+    _routesBeforeBreakdowns ??= List<LiveBusRoute>.from(_liveRoutes);
     final strandedCount = math.max(0, strandedStudentsCount).toInt();
 
     // 1. Identify all remaining unserved stops of the broken bus (from breakdown point until before final Campus Gate)
@@ -115,9 +453,8 @@ class SmartBusProvider extends ChangeNotifier {
         ? leftoverStops
         : brokenRoute.stops.where((s) => !_isCampusStop(s.name)).toList();
 
-    final demandStopCount =
-        math.min(strandedCount, stopsToCover.length).toInt();
-    final demandStops = stopsToCover.take(demandStopCount).toList();
+    final demandStops = stopsToCover;
+    final demandStopCount = demandStops.length;
 
     // The Java backend owns dispatch decisions. Flutter only applies and
     // displays its returned plan; it never independently assigns the stops.
@@ -171,7 +508,9 @@ class SmartBusProvider extends ChangeNotifier {
       if (matchingStops.isEmpty || matchingRoutes.isEmpty) continue;
       final stop = matchingStops.first;
       final rescueRoute = matchingRoutes.first;
-      final etaMinutes = (data['detourEtaMinutes'] as num?)?.toInt() ?? 0;
+      final etaMinutes = (data['estimatedArrivalMinutes'] as num?)?.toInt() ??
+          (data['detourEtaMinutes'] as num?)?.toInt() ??
+          0;
       stopAssignments.add(
         DivertedStopAssignment(
           stopId: stop.id,
@@ -187,9 +526,11 @@ class SmartBusProvider extends ChangeNotifier {
           longitude: stop.longitude,
           isUturnRequired: true,
           detourDistanceKm: (data['detourDistanceKm'] as num?)?.toDouble() ?? 0,
-          estimatedArrival: '~$etaMinutes min',
+          estimatedArrival: '~$etaMinutes min to breakdown pickup',
           studentCount: (data['studentCount'] as num?)?.toInt() ?? 0,
           spareSeatsBefore: (data['spareSeatsBefore'] as num?)?.toInt() ?? 0,
+          estimatedArrivalMinutes: etaMinutes,
+          assignmentReason: data['assignmentReason']?.toString() ?? '',
         ),
       );
     }
@@ -214,9 +555,12 @@ class SmartBusProvider extends ChangeNotifier {
               ),
       unassignedStudentsByStop: Map.unmodifiable(unassignedById),
     );
-    final assignmentsByStop = {
-      for (final assignment in stopAssignments) assignment.stopId: assignment,
-    };
+    final assignmentsByStop = <String, List<DivertedStopAssignment>>{};
+    for (final assignment in stopAssignments) {
+      assignmentsByStop
+          .putIfAbsent(assignment.stopId, () => <DivertedStopAssignment>[])
+          .add(assignment);
+    }
     final busToDivertedStops = <String, List<LiveRouteStop>>{};
     for (final assignment in stopAssignments) {
       final stop = demandStops.firstWhere((s) => s.id == assignment.stopId);
@@ -232,6 +576,27 @@ class SmartBusProvider extends ChangeNotifier {
                   'Rescue pickup (${assignment.studentCount} students from $busNumber)',
             ),
           );
+    }
+
+    // Every dispatched rescue bus first travels to the breakdown coordinate,
+    // collects its allocated passengers, then serves its normal route and the
+    // additional pickup stops without dropping its original stops.
+    final breakdownPickup = LiveRouteStop(
+      id: 'BREAKDOWN-${brokenRoute.busNumber}',
+      name: 'Breakdown pickup · ${brokenRoute.busNumber}',
+      landmark: location,
+      latitude: breakdownPoint.latitude,
+      longitude: breakdownPoint.longitude,
+      order: 0,
+      isDivertedPickup: true,
+      isBreakdownPickup: true,
+      originalBusNumber: brokenRoute.busNumber,
+    );
+    for (final rescueBusNumber in busToDivertedStops.keys) {
+      busToDivertedStops[rescueBusNumber]!.insert(
+        0,
+        breakdownPickup.copyWith(assignedPickupBusNumber: rescueBusNumber),
+      );
     }
 
     final rescueRoutes = availableRoutes
@@ -269,10 +634,14 @@ class SmartBusProvider extends ChangeNotifier {
             stops: route.stops.map((s) {
               final isAffected = affectedStopNames.contains(s.name);
               if (isAffected) {
-                final assignment = assignmentsByStop[s.id];
+                final assignedBuses = (assignmentsByStop[s.id] ?? const [])
+                    .map((assignment) => assignment.assignedBusNumber)
+                    .toSet()
+                    .join(', ');
                 return s.copyWith(
                   isBreakdownStranded: true,
-                  assignedPickupBusNumber: assignment?.assignedBusNumber,
+                  assignedPickupBusNumber:
+                      assignedBuses.isEmpty ? null : assignedBuses,
                 );
               }
               return s;
@@ -280,23 +649,18 @@ class SmartBusProvider extends ChangeNotifier {
           ),
         );
       } else if (busToDivertedStops.containsKey(route.busNumber)) {
-        // Insert this bus's assigned rescue pickups before its campus endpoint.
+        // Serve emergency pickups first, then continue every original stop.
         final divertedList = busToDivertedStops[route.busNumber]!;
         final baseStops =
             route.stops.where((s) => !s.isDivertedPickup).toList();
-        final campusGateIndex = baseStops.indexWhere(
-          (s) => _isCampusStop(s.name),
-        );
-        final newStops = <LiveRouteStop>[];
-
-        if (campusGateIndex != -1) {
-          newStops.addAll(baseStops.sublist(0, campusGateIndex));
-          newStops.addAll(divertedList);
-          newStops.addAll(baseStops.sublist(campusGateIndex));
-        } else {
-          newStops.addAll(baseStops);
-          newStops.addAll(divertedList);
-        }
+        final existingEmergencyStops =
+            route.stops.where((s) => s.isDivertedPickup).toList();
+        final newStops = <LiveRouteStop>[
+          ...existingEmergencyStops,
+          ...divertedList.where((stop) => !existingEmergencyStops
+              .any((existing) => existing.id == stop.id)),
+          ...baseStops,
+        ];
 
         for (int i = 0; i < newStops.length; i++) {
           newStops[i] = newStops[i].copyWith(order: i + 1);
@@ -337,7 +701,7 @@ class SmartBusProvider extends ChangeNotifier {
     final explanation = backendPlan['explanation']?.toString() ??
         'Java dispatch assigned $coveredStudents/$strandedCount passengers. ${plan.unassignedStudents} need manual support.';
 
-    _activeBreakdown = BreakdownRerouteEvent(
+    final newBreakdown = BreakdownRerouteEvent(
       id: backendPlan['id']?.toString() ??
           'BRK-${DateTime.now().millisecondsSinceEpoch}',
       brokenBusNumber: busNumber,
@@ -367,7 +731,10 @@ class SmartBusProvider extends ChangeNotifier {
               stopAssignments.length,
       allStopsCovered: backendPlan['allStopsCovered'] as bool? ??
           stopAssignments.length == demandStopCount,
+      incidentBusNumbers: [busNumber],
     );
+    _activeBreakdown = _mergeBreakdownEvents(_activeBreakdown, newBreakdown);
+    await _refreshActiveBreakdownSnapshot();
 
     // In-app notification for Student
     _notifications.insert(
@@ -458,7 +825,8 @@ class SmartBusProvider extends ChangeNotifier {
   /// Admin can move an assigned passenger group when the target has spare seats.
   bool adminReassignStopToBus(String stopId, String targetBusNumber) {
     final breakdown = _activeBreakdown;
-    if (breakdown != null && targetBusNumber == breakdown.brokenBusNumber) {
+    if (breakdown != null &&
+        breakdown.brokenBusNumbers.contains(targetBusNumber)) {
       return false;
     }
 
@@ -476,11 +844,12 @@ class SmartBusProvider extends ChangeNotifier {
             .where((assignment) => assignment.stopId == stopId)
             .toList() ??
         <DivertedStopAssignment>[];
-    final currentAssignment =
-        matchingAssignments.isEmpty ? null : matchingAssignments.first;
-    final groupSize = currentAssignment?.studentCount ??
-        breakdown?.unassignedStudentsByStop[stopId] ??
-        0;
+    final groupSize = matchingAssignments.isNotEmpty
+        ? matchingAssignments.fold<int>(
+            0,
+            (total, assignment) => total + assignment.studentCount,
+          )
+        : breakdown?.unassignedStudentsByStop[stopId] ?? 0;
     if (breakdown != null && groupSize <= 0) return false;
     final targetRouteMatches = _liveRoutes.where(
       (route) => route.busNumber == targetBusNumber,
@@ -673,6 +1042,7 @@ class SmartBusProvider extends ChangeNotifier {
         coveredRemainingStops: coveredStopCount,
         allStopsCovered:
             coveredStopCount == _activeBreakdown!.totalRemainingStops,
+        incidentBusNumbers: _activeBreakdown!.brokenBusNumbers,
       );
     }
 
@@ -772,6 +1142,7 @@ class SmartBusProvider extends ChangeNotifier {
         coveredRemainingStops: coveredStopCount,
         allStopsCovered:
             coveredStopCount == _activeBreakdown!.totalRemainingStops,
+        incidentBusNumbers: _activeBreakdown!.brokenBusNumbers,
       );
 
       // Notify students
@@ -860,6 +1231,7 @@ class SmartBusProvider extends ChangeNotifier {
         allStopsCovered:
             updatedAssignments.map((a) => a.stopId).toSet().length ==
                 _activeBreakdown!.totalRemainingStops,
+        incidentBusNumbers: _activeBreakdown!.brokenBusNumbers,
       );
     }
 
@@ -868,8 +1240,18 @@ class SmartBusProvider extends ChangeNotifier {
 
   /// Resolve active breakdown and restore standard routes
   void resolveActiveBreakdown() {
+    unawaited(
+      http
+          .post(
+            Uri.parse(AppConfig.endpoint('/api/operations/breakdowns/resolve')),
+            headers: AuthApiService.authenticatedHeaders,
+          )
+          .timeout(const Duration(seconds: 10))
+          .catchError((Object _) => http.Response('', 500)),
+    );
     _activeBreakdown = null;
-    _liveRoutes = List.from(MockData.liveBusRoutes);
+    _liveRoutes = List.from(_routesBeforeBreakdowns ?? MockData.liveBusRoutes);
+    _routesBeforeBreakdowns = null;
     _breakdownAlerts.clear();
     notifyListeners();
   }

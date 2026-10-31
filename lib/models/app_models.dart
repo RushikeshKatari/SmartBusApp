@@ -320,6 +320,7 @@ class LiveRouteStop {
     this.isBreakdownStranded = false,
     this.assignedPickupBusNumber,
     this.isDivertedPickup = false,
+    this.isBreakdownPickup = false,
     this.originalBusNumber,
     this.isUturnDetour = false,
     this.divertedOrderLabel,
@@ -333,6 +334,7 @@ class LiveRouteStop {
   final bool isBreakdownStranded;
   final String? assignedPickupBusNumber;
   final bool isDivertedPickup;
+  final bool isBreakdownPickup;
   final String? originalBusNumber;
   final bool isUturnDetour;
   final String? divertedOrderLabel;
@@ -344,6 +346,7 @@ class LiveRouteStop {
     bool? isBreakdownStranded,
     String? assignedPickupBusNumber,
     bool? isDivertedPickup,
+    bool? isBreakdownPickup,
     String? originalBusNumber,
     bool? isUturnDetour,
     String? divertedOrderLabel,
@@ -365,6 +368,7 @@ class LiveRouteStop {
         assignedPickupBusNumber:
             assignedPickupBusNumber ?? this.assignedPickupBusNumber,
         isDivertedPickup: isDivertedPickup ?? this.isDivertedPickup,
+        isBreakdownPickup: isBreakdownPickup ?? this.isBreakdownPickup,
         originalBusNumber: originalBusNumber ?? this.originalBusNumber,
         isUturnDetour: isUturnDetour ?? this.isUturnDetour,
         divertedOrderLabel: divertedOrderLabel ?? this.divertedOrderLabel,
@@ -391,6 +395,7 @@ class LiveBusRoute {
     this.breakdownReason,
     this.breakdownLocation,
     this.assignedReplacementBusNumber,
+    this.hasCustomPath = false,
   });
   final String id,
       routeNumber,
@@ -404,6 +409,7 @@ class LiveBusRoute {
   final double totalDistanceKm;
   final int totalDurationMinutes;
   final bool isBrokenDown;
+  final bool hasCustomPath;
   final String? breakdownReason,
       breakdownLocation,
       assignedReplacementBusNumber;
@@ -416,6 +422,7 @@ class LiveBusRoute {
     List<LiveRouteStop>? stops,
     double? totalDistanceKm,
     int? totalDurationMinutes,
+    bool? hasCustomPath,
   }) =>
       LiveBusRoute(
         id: id,
@@ -430,6 +437,7 @@ class LiveBusRoute {
         totalDistanceKm: totalDistanceKm ?? this.totalDistanceKm,
         totalDurationMinutes: totalDurationMinutes ?? this.totalDurationMinutes,
         isBrokenDown: isBrokenDown ?? this.isBrokenDown,
+        hasCustomPath: hasCustomPath ?? this.hasCustomPath,
         breakdownReason: breakdownReason ?? this.breakdownReason,
         breakdownLocation: breakdownLocation ?? this.breakdownLocation,
         assignedReplacementBusNumber:
@@ -453,6 +461,8 @@ class DivertedStopAssignment {
     required this.estimatedArrival,
     this.studentCount = 0,
     this.spareSeatsBefore = 0,
+    this.estimatedArrivalMinutes = 0,
+    this.assignmentReason = '',
     this.isInvalidated = false,
     this.redirectToStopName,
     this.redirectMessage,
@@ -467,6 +477,8 @@ class DivertedStopAssignment {
       estimatedArrival;
   final double latitude, longitude, detourDistanceKm;
   final int studentCount, spareSeatsBefore;
+  final int estimatedArrivalMinutes;
+  final String assignmentReason;
   final bool isUturnRequired;
   final bool isInvalidated;
   final String? redirectToStopName;
@@ -482,6 +494,8 @@ class DivertedStopAssignment {
     String? estimatedArrival,
     int? studentCount,
     int? spareSeatsBefore,
+    int? estimatedArrivalMinutes,
+    String? assignmentReason,
     bool? isInvalidated,
     String? redirectToStopName,
     String? redirectMessage,
@@ -501,6 +515,9 @@ class DivertedStopAssignment {
         estimatedArrival: estimatedArrival ?? this.estimatedArrival,
         studentCount: studentCount ?? this.studentCount,
         spareSeatsBefore: spareSeatsBefore ?? this.spareSeatsBefore,
+        estimatedArrivalMinutes:
+            estimatedArrivalMinutes ?? this.estimatedArrivalMinutes,
+        assignmentReason: assignmentReason ?? this.assignmentReason,
         isInvalidated: isInvalidated ?? this.isInvalidated,
         redirectToStopName: redirectToStopName ?? this.redirectToStopName,
         redirectMessage: redirectMessage ?? this.redirectMessage,
@@ -530,6 +547,7 @@ class BreakdownRerouteEvent {
     this.totalRemainingStops = 0,
     this.coveredRemainingStops = 0,
     this.allStopsCovered = true,
+    this.incidentBusNumbers = const [],
   });
   final String id,
       brokenBusNumber,
@@ -547,10 +565,14 @@ class BreakdownRerouteEvent {
   final double detourDistanceKm;
   final List<String> affectedStopNames;
   final List<DivertedStopAssignment> stopAssignments;
+  final List<String> incidentBusNumbers;
   final Map<String, int> unassignedStudentsByStop;
   final int totalRemainingStops;
   final int coveredRemainingStops;
   final bool allStopsCovered;
+
+  List<String> get brokenBusNumbers =>
+      incidentBusNumbers.isEmpty ? [brokenBusNumber] : incidentBusNumbers;
 
   int get studentsCovered => stopAssignments.fold<int>(
         0,
